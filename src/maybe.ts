@@ -1,41 +1,55 @@
-export class Maybe<T> {
-	constructor(public value: null | [T]) {
-	}
+export type Maybe<T> = [T] | null;
 
-	unwrapWithDefault(d: T): T {
-		if (this.value) return this.value[0];
-		return d;
-	}
-
-	mapSome<B = unknown>(f: (v: T) => B) {
-		if (this.value) return new Maybe([f(this.value[0])]);
-		return null;
-	}
-
-	or(other: Maybe<T>) {
-		if (this.value) return this;
-		return other;
-	}
-
-	apply<B>(f: Maybe<(a: T) => B>): Maybe<B> {
-		if (this.value && f.value) {
-			return new Maybe([f.value[0](this.value[0])]);
-		}
-
-		return nothing;
-	}
-
-	bind<B>(f: (a: T) => Maybe<B>): Maybe<B> {
-		if (this.value) {
-			return f(this.value[0]);
-		}
-
-		return nothing;
-	}
+export function withDefault<T>(v: Maybe<T>, d: T) {
+	if (v == null) return d;
+	return v[0];
 }
 
-export const nothing: Maybe<any> = new Maybe(null);
+export function isSome<T>(a: Maybe<T>): a is [T] {
+	return a != null;
+}
 
 export function some<T>(v: T): Maybe<T> {
-	return new Maybe([v]);
+	return [v];
+}
+
+export function alternate<T>(a: Maybe<T>, ...alts: Maybe<T>[]): Maybe<T> {
+	if (isSome(a)) return a;
+
+	for(let alt of alts) {
+		if (isSome(alt)) return alt;
+	}
+
+	return null;
+}
+
+export function maybeOfNullable<T>(v: T | null | undefined): Maybe<T> {
+	if (v == null) return null;
+	return [v];
+}
+
+export function mapSome<A, B>(a: Maybe<A>, f: (a: A) => B): Maybe<B> {
+	if (isSome(a)) {
+		return [f(a[0])];
+	}
+
+	return null;
+}
+
+export function bindSome<A, B>(a: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> {
+	if (isSome(a)) {
+		return f(a[0]);
+	}
+
+	return null;
+}
+
+export function applySome<A, B>(f: Maybe<(a: A) => B>, a: Maybe<A>): Maybe<B> {
+	if (isSome(f)) {
+		if (isSome(a)) {
+			return [f[0](a[0])];
+		}
+	}
+
+	return null;
 }

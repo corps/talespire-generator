@@ -7,5 +7,3 @@ RUN npm install
 COPY . /app
 ENV PATH=/app/node_modules/.bin:$PATH
 CMD npm start
-
-
