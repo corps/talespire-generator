@@ -1,20 +1,35 @@
-import {ungzip} from "pako";
+import {gzip, ungzip} from "pako";
 import {mapSome, Maybe, maybeOfNullable} from "./maybe";
-import {DataViewAccessor} from "./autoproto";
-
-const {read, lift, tuple} = DataViewAccessor;
+import {byte, DataViewAccessor, float32, int16, uint16, uint32} from "./autoproto";
+const {tuple, lift, array, obj} = DataViewAccessor;
 
 export function decompress(slabStr: string): Maybe<DataView> {
 	return mapSome(maybeOfNullable(ungzip(new Uint8Array(atob(slabStr).split('').map(x => x.charCodeAt(0))))), v => new DataView(v.buffer))
 }
 
-const hexDigit = read(false, 1)
-	.map((byte) => ('0' + byte.toString(16)).slice(-2), v => parseInt(v, 255));
-const header = tuple(read(false, 4), read(false, 2)).map(
-	([magic, version]) => ({magic, version}),
-	({magic, version}) => [magic, version]
-);
-const hexId = tuple(
+export function compress(array: Uint8Array): string {
+	return btoa(String.fromCharCode(...gzip(array)));
+}
+
+export const hexDigit = byte.map((byte) => ('0' + byte.toString(16)).slice(-2), v => parseInt(v, 16));
+export const header = obj({
+	magic: uint32,
+	version: uint16,
+});
+
+function joinedString(a: DataViewAccessor<string>, stringLength: number, count: number, joinBy: string): DataViewAccessor<string> {
+	return a.repeat(lift(count)).map(s => s.join(joinBy), s => {
+		const result: string[] = [];
+		const parts = s.split(joinBy);
+		while (parts.length) {
+			result.push(parts.slice(0, stringLength));
+			s = s.slice(stringLength);
+		}
+		return result;
+	})
+}
+
+export const hexId = tuple(
 	tuple(hexDigit, hexDigit, hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
@@ -30,53 +45,57 @@ const hexId = tuple(
 			[s.slice(24, 26), s.slice(26, 28), s.slice(28, 30), s.slice(30, 32), s.slice(32, 34), s.slice(34, 36)]
 	]
 )
-const layout = tuple(hexId, read(false, 4), read(false, 2)).map(([id, count]) => ({id, count}), ({id, count}) => [id, count, 0]);
-const layouts = layout.repeat(read(false, 4));
+export const v2Asset = obj({
+	id: tuple(hexId, tuple(hexDigit, hexDigit).map()).map(parts => parts.),
+	count: uint16,
+})
 
-export const slab = tuple(header, layouts).map(([header, layouts]) => ({header, layouts}), ({header, layouts}) => [header, layouts]);
+export const assets = asset.repeat(uint16);
 
+export const layout = obj({
+	center: obj({
+		x: float32,
+		y: float32,
+		z: float32,
+	}),
+	extents: obj({
+		x: float32,
+		y: float32,
+		z: float32,
+	}),
+	rot: byte,
+});
 
-// function parsePositions(reader: BinReader, layouts: ReturnType<typeof parseLayouts>) {
-// 	const positions = [];
-// 	layouts.forEach(layout => {
-// 		const layoutPosition = [];
-// 		positions.push(layoutPosition);
-// 		for (let i = 0; i < layout.assetCount; ++i) {
-//
-// 		}
-// 	})
-// }
+export const assetsAndLayout = assets.then((assets) => array(assets.map(({count, id, padding}) => obj({
+		id: lift(id),
+		positions: layout.repeat(lift(count)),
+		padding: lift(padding),
+	})))
+, (layouts) => (
+	layouts.map(({id, positions, padding}) => ({
+			id,
+			count: positions.length,
+			padding,
+		}))));
 
-// function parseLayouts(reader: BinReader) {
-// 	const num = reader.consumeUInt32();
-// 	const layouts = [];
-//
-// 	for (let i = 0; i < num; ++i) {
-// 		const uuid = [
-// 			[reader.consumeInt8(), reader.consumeInt8(), reader.consumeInt8(), reader.consumeInt8(),],
-// 			[reader.consumeInt8(), reader.consumeInt8(),],
-// 			[reader.consumeInt8(), reader.consumeInt8(),],
-// 			[reader.consumeInt8(), reader.consumeInt8(),],
-// 			[
-// 				reader.consumeInt8(),
-// 				reader.consumeInt8(),
-// 				reader.consumeInt8(),
-// 				reader.consumeInt8(),
-// 				reader.consumeInt8(),
-// 				reader.consumeInt8(),
-// 			]
-// 		].map(toHexChunk).join('-');
-// 		const assetCount = reader.consumeUInt32();
-// 		layouts.push({uuid, assetCount});
-//
-// 		// unknown struct end section
-// 		// reader.consumeInt16();
-// 	}
-//
-// 	return layouts;
-// }
-//
-// function toHexChunk(byteArray: number[]) {
-// 	return byteArray.map(byte => ('0' + (byte + 0xFF).toString(16)).slice(-2)).join('');
-// }
-//
+export const v2Slab = repeat()
+
+const MAGIC = 1;
+export const slab = header.then(({magic, version}) => {
+	if (magic != MAGIC) {
+		throw new Error(`Invalid slab, magic header value was ${magic}, expected ${MAGIC}`);
+	}
+
+	switch (version) {
+		case 1:
+			return obj({
+				magic: lift(magic),
+				version: lift(version),
+				slab: v2Slab
+			});
+		default:
+			throw new Error(`Invalid slab, unknown version ${version}`)
+	}
+}, ({version, magic}) => ({version, magic}))
+
+export type Slab = typeof slab.d;
