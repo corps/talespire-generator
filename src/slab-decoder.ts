@@ -39,11 +39,11 @@ export const uuid = tuple(tuple(hexDigit, hexDigit, hexDigit, hexDigit),
 
 export const v1AssetHeader = withPadding(obj({
 	id: uuid, count: uint16
-})).repeat(uint16)
+}), byte.repeat(lift(2))).repeat(uint16)
 
 export const v2AssetHeader = withPadding(obj({
 	id: uuid, count: uint16,
-})).repeat(uint16);
+}), byte.repeat(lift(2))).repeat(uint16);
 
 const BITS_PER_COMPONENT = 18;
 const BITS_FOR_ROTATION = 5;
@@ -54,13 +54,7 @@ const Z_BITS_OFFSET = Y_BITS_OFFSET + BITS_PER_COMPONENT;
 const ROTATION_BITS_OFFSET = Z_BITS_OFFSET + BITS_PER_COMPONENT;
 const EXTRA_BITS_OFFSET = ROTATION_BITS_OFFSET + BITS_FOR_ROTATION;
 const DEGREES_PER_ROT_STEP = 360 / 24;
-//
-// const v2Positions = tuple(byte, byte, byte, byte, byte, byte, byte, byte).map(
-// 	([h, g, f, e, d, c, b, a]) => {
-// 		const x = a << 18 + b << 10 + (c & ((1 << 2) - 1));
-// 	},
-// 	() => [0, 0, 0, 0]
-// )
+
 
 function v2AssetPositions(id: string, count: number) {
 	return obj({
@@ -91,12 +85,12 @@ export const v1Shape = obj({
 function v1AssetPositions(id: string, count: number) {
 	return obj({
 		id: lift(id),
-		positions: withPadding(v1Shape, 3).repeat(lift(count))
+		positions: withPadding(v1Shape, byte.repeat(lift(3))).repeat(lift(count))
 	});
 }
 
 export function v2AssetBody(assets: typeof v2AssetHeader.d) {
-	return withPadding(array(assets.map(({count, id}) => v2AssetPositions(id, count))));
+	return withPadding(array(assets.map(({count, id}) => v2AssetPositions(id, count))), byte.repeat(lift(2)));
 }
 
 function v1AssetBody(assets: typeof v1AssetHeader.d) {
@@ -113,7 +107,7 @@ export const v2Assets = v2AssetHeader.then(
 	(assets) => assets.map(({id, positions}) => ({id, count: positions.length}))
 )
 
-export const v1AssetBounds = withPadding(v1Shape, 3, 255);
+export const v1AssetBounds = withPadding(v1Shape, byte.withDefault(255).repeat(lift(3)));
 
 export const slab = header.then(({magic, version}) => {
 	if (magic != MAGIC) {
