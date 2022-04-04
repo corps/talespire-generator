@@ -25,7 +25,7 @@ function fillOut(bits: number) {
 	return (1 << bits) - 1;
 }
 
-function invert(value: number, bits: number) {
+function invert(bits: number, value: number) {
 	return fillOut(bits) - value;
 }
 
@@ -33,12 +33,14 @@ function rangeMask(start: number, width: number) {
 	return fillOut(width) << start;
 }
 
-function clamp(value: number, bits: number) {
-	return bits & fillOut(bits);
+function clamp(bits: number, value: number) {
+	return value & fillOut(bits);
 }
 
 function copyBits(bits: number, mask: number, from: number, to: number) {
-	return clamp(from, bits) & invert(bits, mask) | (clamp(to, bits) & mask);
+	to = clamp(bits, to);
+	from = clamp(bits, from);
+	return (to & (invert(bits, mask))) | (from & mask);
 }
 
 export class BitView {
@@ -64,15 +66,15 @@ export class BitView {
 		let v = 0;
 
 		if (idx + bits > this.bitLength) {
-			throw new Error('Unexpected EOF!');
+			throw new Error(`Unexpected EOF! ${idx} ${bits} ${this.bitLength}`);
 		}
 
 		let pos = 0;
 		while (pos < bits) {
 			const [byteOffset, bitOffset] = this.position(idx + pos);
-			const chunkLength = Math.min(bits, 8 - bitOffset);
+			const chunkLength = Math.min(bits - pos, 8 - bitOffset);
 
-			v += (this.dv.getUint8(byteOffset) & rangeMask(bitOffset, chunkLength)) << pos;
+			v += ((this.dv.getUint8(byteOffset) & rangeMask(bitOffset, chunkLength)) >> bitOffset) << pos;
 			pos += chunkLength;
 		}
 
@@ -87,12 +89,17 @@ export class BitView {
 		let pos = 0;
 		while (pos < bits) {
 			const [byteOffset, bitOffset] = this.position(idx + pos);
-			const chunkLength = Math.min(bits, 8 - bitOffset);
+			const chunkLength = Math.min(bits - pos, 8 - bitOffset);
+
+			let byteChunkValue = value & rangeMask(pos, chunkLength);
+			byteChunkValue = byteChunkValue >> pos;
+			byteChunkValue = byteChunkValue << bitOffset;
 
 			this.dv.setUint8(byteOffset,
-				copyBits(8, rangeMask(bitOffset, chunkLength),
-					((value & rangeMask(pos, chunkLength)) >> pos) << bitOffset
-					, this.dv.getUint8(byteOffset)));
+				copyBits(8,
+					rangeMask(bitOffset, chunkLength),
+					byteChunkValue,
+					this.dv.getUint8(byteOffset)));
 
 			pos += chunkLength;
 		}
@@ -218,7 +225,7 @@ export class DataAccessor<State, View> {
 	}
 }
 
-export function readU(bits: number): DataAccessor<number, BitView> {
+export function unpack(bits: number): DataAccessor<number, BitView> {
 	return new DataAccessor<number, BitView>((idx, dv: BitView) => {
 		return [dv.read(idx, bits), idx + bits];
 	}, (idx, num) => {
@@ -230,13 +237,18 @@ export function readU(bits: number): DataAccessor<number, BitView> {
 	}, 0)
 }
 
-export function parseBits<T>(bytes: number, accessor: DataAccessor<T, BitView>): DataAccessor<T, DataView> {
+export function pack<T>(bytes: number, accessor: DataAccessor<T, BitView>, littleEndian = true): DataAccessor<T, DataView> {
 	return new DataAccessor<T, DataView>(
 		(idx, dv) => {
-			
+			dv = new DataView(dv.buffer, idx);
+			const [state] = accessor.read(0, new BitView(dv, littleEndian));
+			return [state, idx + bytes]
 		},
 		(idx, v) => {
-
+			return [idx + bytes, (dv: DataView) => {
+				dv = new DataView(dv.buffer, idx);
+				accessor.write(0, v)[1](new BitView(dv, littleEndian));
+			}]
 		},
 		accessor.d
 	)

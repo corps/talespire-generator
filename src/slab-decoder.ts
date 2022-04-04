@@ -1,6 +1,6 @@
 import {gzip, ungzip} from "pako";
 import {mapSome, Maybe, maybeOfNullable} from "./maybe";
-import {byte, DataAccessor, float32, int16, uint16, uint32} from "./autoproto";
+import {byte, DataAccessor, float32, int16, pack, uint16, uint32, unpack} from "./autoproto";
 
 const {tuple, lift, array, obj} = DataAccessor;
 const MAGIC = 3520002766;
@@ -18,7 +18,7 @@ export function compress(v: DataView): string {
 }
 
 function withPadding<T, View>(accessor: DataAccessor<T, View>, padding: DataAccessor<any, View>): DataAccessor<T, View> {
-	return tuple(accessor, lift(padding.d)).map(([a, b]) => a, (a) => [a, padding.d]);
+	return tuple(accessor, padding).map(([a, b]) => a, (a) => [a, padding.d]);
 }
 
 export const hexDigit = byte.map((byte) => ('0' + byte.toString(16)).slice(-2), v => parseInt(v, 16) || 0);
@@ -37,77 +37,34 @@ export const uuid = tuple(tuple(hexDigit, hexDigit, hexDigit, hexDigit),
 	[s.slice(19, 21), s.slice(21, 23), s.slice(23, 25), s.slice(25, 27), s.slice(27, 29), s.slice(29, 31), s.slice(31, 33), s.slice(33, 35)]
 ])
 
-export const v1AssetHeader = withPadding(obj({
-	id: uuid, count: uint16
-}), byte.repeat(lift(2))).repeat(uint16)
+export const v2AssetHeader = obj({
+	id: uuid,
+	count: withPadding(uint16, uint16),
+}).repeat(withPadding(uint16, uint16));
 
-export const v2AssetHeader = withPadding(obj({
-	id: uuid, count: uint16,
-}), byte.repeat(lift(2))).repeat(uint16);
-
-const BITS_PER_COMPONENT = 18;
-const BITS_FOR_ROTATION = 5;
-const ROT_MASK = (1 << BITS_FOR_ROTATION) - 1;
-const ENCODED_POSITION_MAX_VALUE = (1 << BITS_PER_COMPONENT) - 1;
-const Y_BITS_OFFSET = BITS_PER_COMPONENT;
-const Z_BITS_OFFSET = Y_BITS_OFFSET + BITS_PER_COMPONENT;
-const ROTATION_BITS_OFFSET = Z_BITS_OFFSET + BITS_PER_COMPONENT;
-const EXTRA_BITS_OFFSET = ROTATION_BITS_OFFSET + BITS_FOR_ROTATION;
-const DEGREES_PER_ROT_STEP = 360 / 24;
-
+const v2PosComponent = withPadding(unpack(16), unpack(2)).map(v => v / 100, v => Math.floor(v * 100));
+const v2Rot = withPadding(unpack(5), unpack(3)).map(n => n * 15, deg => Math.floor(deg / 15));
 
 function v2AssetPositions(id: string, count: number) {
 	return obj({
 		id: lift(id),
-		positions: obj({
-			x: uint16,
-			z: uint16,
-			y: uint16,
-			rot: int16,
-		}).repeat(lift(count))
-	})
-}
-
-export const v1Shape = obj({
-	center: obj({
-		x: float32,
-		y: float32,
-		z: float32,
-	}),
-	extents: obj({
-		x: float32,
-		y: float32,
-		z: float32,
-	}),
-	rot: byte,
-})
-
-function v1AssetPositions(id: string, count: number) {
-	return obj({
-		id: lift(id),
-		positions: withPadding(v1Shape, byte.repeat(lift(3))).repeat(lift(count))
+		positions: pack(8, withPadding(obj({
+			x: v2PosComponent,
+			y: v2PosComponent,
+			z: v2PosComponent,
+			rot: v2Rot,
+		}), unpack(2))).repeat(lift(count))
 	});
 }
 
 export function v2AssetBody(assets: typeof v2AssetHeader.d) {
-	return withPadding(array(assets.map(({count, id}) => v2AssetPositions(id, count))), byte.repeat(lift(2)));
+	return array(assets.map(({count, id}) => v2AssetPositions(id, count)));
 }
 
-function v1AssetBody(assets: typeof v1AssetHeader.d) {
-	return array(assets.map(({count, id}) => v1AssetPositions(id, count)));
-}
-
-export const v1Assets = v1AssetHeader.then(
-	(assets) => v1AssetBody(assets),
-	(assets) => assets.map(({id, positions}) => ({id, count: positions.length}))
-)
-
-export const v2Assets = v2AssetHeader.then(
+export const v2Assets = withPadding(v2AssetHeader.then(
 	(assets) => v2AssetBody(assets),
 	(assets) => assets.map(({id, positions}) => ({id, count: positions.length}))
-)
-
-export const v1AssetBounds = withPadding(v1Shape, byte.withDefault(255).repeat(lift(3)));
+), uint16);
 
 export const slab = header.then(({magic, version}) => {
 	if (magic != MAGIC) {

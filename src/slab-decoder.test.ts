@@ -3,13 +3,11 @@ import {mapSome, withDefault} from "./maybe";
 import {DataAccessor} from "./autoproto";
 
 function testWithSlab(s: string, expectation: any) {
-	// expect(withDefault(mapSome(decompress(s), s => compress(s)), "")).toEqual(s)
-	const r = mapSome(decompress(s), (v) => slab.decode(v, true));
+	const r = mapSome(decompress(s), (v) => slab.decode(v, v.byteLength));
 	expect(r).toEqual(expectation);
-	const rencoded = withDefault(mapSome(r, r => compress(slab.encode(r))), "");
-	// expect(rencoded).toEqual(s);
+	const rencoded = withDefault(mapSome(r, r => compress(slab.encode(r, (n) => new DataView(new Uint8Array(n).buffer)))), "");
 	expect(decompress(s)).toEqual(decompress(rencoded))
-	const rr = mapSome(decompress(rencoded), (v) => slab.decode(v, true));
+	const rr = mapSome(decompress(rencoded), (v) => slab.decode(v, v.byteLength));
 	expect(rr).toEqual(expectation);
 }
 
@@ -22,28 +20,28 @@ describe('slab-decoder', () => {
 						{
 							"assets": [
 								{
-									"id": "00008b74-8f53-ba19-6e49-87df10618a93-1874",
+									"id": "8b748f53-ba19-6e49-87df10618a931874",
 									"positions": [
 										{
-											"rot": 1088,
-											"x": 399,
-											"z": 0,
-											"y": 4432
+											"rot": 255,
+											"x": 3.99,
+											"z": 2.77,
+											"y": 0
 										}
 									]
 								},
 								{
-									"id": "0000b821-efe2-4261-3541-98599281a8b2-56fc",
+									"id": "b821efe2-4261-3541-98599281a8b256fc",
 									"positions": [
 										{
-											"rot": 576,
+											"rot": 135,
 											"x": 0,
-											"z": 0,
-											"y": 1360
+											"z": 0.85,
+											"y": 0
 										},
 										{
-											"rot": 576,
-											"x": 795,
+											"rot": 135,
+											"x": 7.95,
 											"z": 0,
 											"y": 0
 										}
