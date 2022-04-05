@@ -1,4 +1,45 @@
-import {BitView} from "./autoproto";
+import {BitView, JsonDataAcccesor, jsonAny, jsonEncoder, jsonNumber, jsonUndefined, jsonBoolean, jsonString, jsonNull} from "./autoproto";
+import {right} from "./either";
+const {jsonObj, jsonDict, jsonArray, jsonScalar} = JsonDataAcccesor;
+
+function testJsonAccessor<V>(accessor: JsonDataAcccesor<V>, v: V, expected: any = v) {
+	const encoded = accessor.encode(v, (s) => new Array(s));
+	expect(accessor.decode(encoded, encoded.length)).toEqual(expected);
+}
+
+describe('JsonDataAccessor', () => {
+	describe('jsonScalar', () => {
+		it('works', () => {
+			testJsonAccessor(jsonScalar, [["string", "hello"]])
+			testJsonAccessor(jsonScalar, [["array", 2], ["number", 3], ["number", 6]])
+		})
+	})
+	describe('jsonString', () => {
+		it('works', () => {
+			testJsonAccessor(jsonString, right("hello"))
+		})
+	})
+	describe('a complex example', () => {
+		it('works', () => {
+			const reader = jsonObj({
+				version: jsonNumber,
+				elements: jsonArray(jsonArray(jsonDict(jsonObj({
+					a: jsonString,
+					b: jsonNull,
+				}))))
+			})
+			const value = {
+				version: 12,
+				elements: [[], [{}, {vv: {a: "asdf", b: null}}]]
+			};
+			const spine = jsonEncoder.encode(value, (v) => new Array(v));
+
+			const decoded = reader.decode(spine, spine.length);
+			expect(decoded).toEqual({});
+		})
+
+	})
+})
 
 describe('BitView', () => {
 	describe('read', () => {
