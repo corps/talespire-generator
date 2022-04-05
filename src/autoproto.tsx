@@ -415,20 +415,20 @@ export type JsonResult<T> = Either<T, JsonErrorResult>
 export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 	static readChunk<T extends JsonSpineType>(example: JsonSpineAtom<T>): JsonDataAcccesor<JsonResult<JsonSpineValue<T>>> {
 		const {jsonScalar, lift} = JsonDataAcccesor;
-		return jsonScalar.then((scalar, start) => {
+		return jsonScalar.then((scalar, start, end) => {
 			const [head] = scalar;
 			if (Array.isArray(head)) {
 				if (Array.isArray(example)) {
 					if (example[0] === head[0]) {
-						return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>((idx, dv) => [right<any, any>(head[1]), start],
-							(idx, v) => [idx + 1, (dv) => dv[idx] = head],
+						return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>((idx, dv) => [right<any, any>(head[1]), start + 1],
+							(idx, v) => [start, (dv) => null],
 							right<any, any>(head[1]),
 						);
 					}
 				}
 			} else if (head === example) {
-				return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>((idx, dv) => [right<any, any>(head), start],
-					(idx, v) => [idx + 1, (dv) => dv[idx] = head],
+				return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>((idx, dv) => [right<any, any>(head), start + 1],
+					(idx, v) => [start, (dv) => null],
 					right<any, any>(head),
 				);
 			}
