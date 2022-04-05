@@ -1,3 +1,16 @@
+import {ReadonlyDeep} from "type-fest";
+import {Maybe} from "./maybe";
+import {
+	accUntilLeft, applyRight,
+	bindRight,
+	Either,
+	flipLeftRight,
+	joinLeftRight,
+	left,
+	mapRight,
+	right
+} from "./either";
+
 type Writer<View> = (dv: View) => void;
 type Read<State, View> = (idx: number, dv: View) => [State, number];
 type Write<State, View> = (idx: number, state: State) => [number, Writer<View>];
@@ -106,6 +119,37 @@ export class BitView {
 	}
 }
 
+// 1 2 [0, 3]
+
+
+// export class JsonView {
+// 	constructor(public data: any, public d: any) {
+// 	}
+//
+// 	static undefined: JsonSpineAtom = [[], undefined];
+// 	static null: JsonSpineAtom = [[], null];
+// 	static emptyPath: any[] = [];
+//
+// 	read(index: number): ReadonlyArray<JsonSpineAtom> {
+// 		if (index >= this.data.length) throw new Error('Unexpected EOF!');
+// 		return this.data[index];
+// 	}
+//
+// 	write(index: number, value: JsonSpineAtom) {
+// 		if (index >= this.data.length) throw new Error('Unexpected EOF!');
+// 		// @ts-ignore
+// 		this.data[index] = value;
+// 	}
+//
+// 	static fromLength(len: number): JsonView {
+// 		return new JsonView(new Array(len));
+// 	}
+//
+// 	static readString(expectedPath = JsonView.emptyPath) {
+//
+// 	}
+// }
+
 export class DataAccessor<State, View> {
 	constructor(public read: Read<State, View>, public write: Write<State, View>, public d: State) {
 	}
@@ -115,28 +159,28 @@ export class DataAccessor<State, View> {
 	}
 
 
-	map<R>(mapped: (i: State) => R, reverse: (r: R) => State) {
+	map<R>(mapped: (i: State, idx: number, end: number) => R, reverse: (r: R) => State) {
 		return new DataAccessor<R, View>((idx, dv) => {
 			const [s, i] = this.read(idx, dv);
-			return [mapped(s), i];
+			return [mapped(s, idx, i), i];
 		}, (idx, r) => {
 			return this.write(idx, reverse(r));
-		}, mapped(this.d))
+		}, mapped(this.d, 0, 0))
 	}
 
 	static lift<V>(v: V) {
 		return new DataAccessor<V, any>((idx) => [v, idx], (idx) => [idx, () => null], v)
 	}
 
-	then<R>(accessor: (i: State) => DataAccessor<R, View>, reverse: (r: R) => State,) {
+	then<R>(accessor: (i: State, idx: number, end: number) => DataAccessor<R, View>, reverse: (r: R) => State,) {
 		return new DataAccessor<R, View>((idx, dv) => {
 			const [s, i] = this.read(idx, dv);
-			const [ss, ii] = accessor(s).read(i, dv);
+			const [ss, ii] = accessor(s, idx, i).read(i, dv);
 			return [ss, ii];
 		}, (idx, r) => {
 			const s = reverse(r);
-			const {write} = accessor(s);
 			const [i, w] = this.write(idx, s)
+			const {write} = accessor(s, idx, i);
 			const [ii, ww] = write(i, r);
 			return [
 				ii, (dv) => {
@@ -144,7 +188,7 @@ export class DataAccessor<State, View> {
 					ww(dv);
 				}
 			]
-		}, accessor(this.d).d)
+		}, accessor(this.d, 0, 0).d)
 	}
 
 	repeat<Counter>(cnt: DataAccessor<number, View>): DataAccessor<State[], View> {
@@ -355,3 +399,176 @@ export const uint16 = read(false, 2);
 export const uint32 = read(false, 4);
 export const int16 = read(true, 2);
 export const float32 = read(true, 4, true);
+
+
+type JsonSpineType = "number" | "array" | "string" | "boolean" | "dict" | undefined | null;
+type JsonSpineValue<T> = T extends "number" ? number :
+	T extends "array" ? number :
+		T extends "string" ? string :
+			T extends "boolean" ? boolean :
+				T extends "dict" ? string[] :
+	T extends null ? null : T extends undefined ? undefined : unknown;
+type JsonSpineAtom<T extends JsonSpineType> = T extends string ? [T, JsonSpineValue<T>] : T;
+type AnyJsonSpineAtom = JsonSpineAtom<"number"> | JsonSpineAtom<"string"> | JsonSpineAtom<"boolean"> | JsonSpineAtom<"dict"> | JsonSpineAtom<"array"> | JsonSpineAtom<undefined> | JsonSpineAtom<null>;
+type JsonScalar = [AnyJsonSpineAtom, ...AnyJsonSpineAtom[]];
+type JsonSpine = AnyJsonSpineAtom[];
+
+type JsonError = "invalid_type" | ["missing_key", string] | ["extra_key", string];
+type JsonErrorResult = [JsonScalar, JsonError];
+type JsonResult<T> = Either<T, JsonErrorResult>
+
+
+// jsonScalar => 1:1 what you give
+// left => the actual scalar
+// right => the head? scalar only
+
+class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
+	static readChunk<T extends JsonSpineType>(example: JsonSpineAtom<T>) {
+		return JsonDataAcccesor.jsonScalar.then((scalar, start) => {
+				const [head] = scalar;
+				if (Array.isArray(head)) {
+					if (Array.isArray(example)) {
+						if (example[0] === head[0]) {
+							return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>(
+								(idx, dv) => [right<any, any>(head[1]), start],
+								(idx, v) => [idx + 1, (dv) => dv[idx] = head],
+								right<any, any>(head[1]),
+							);
+						}
+					}
+				} else if (head === example) {
+					return new JsonDataAcccesor<JsonResult<JsonSpineValue<T>>>(
+						(idx, dv) => [right<any, any>(head), start],
+						(idx, v) => [idx + 1, (dv) => dv[idx] = head],
+						right<any, any>(head),
+					);
+				}
+
+			return JsonDataAcccesor.lift(left<[JsonScalar, JsonError], JsonSpineValue<T>>([scalar, "invalid_type"]));
+		}, res => joinLeftRight(res, head => {
+			if (Array.isArray(example)) {
+				return [[example[0], head]] as JsonScalar
+			}
+
+			return [head] as JsonScalar;
+		}, ([scalar]) => scalar));
+	}
+
+	static defaultFor<T extends JsonSpineType>(v: JsonSpineAtom<T>): JsonSpineValue<T> {
+		if (Array.isArray(v)) {
+			return v[1] as any;
+		}
+
+		return v as any;
+	}
+
+	static jsonScalar = new JsonDataAcccesor<JsonScalar>(
+		(idx, dv) => {
+			const v = dv[idx];
+			let end = idx + 1;
+			if (Array.isArray(v)) {
+				if (v[0] === "array") {
+					const [_, i] = JsonDataAcccesor.jsonScalar.repeat(JsonDataAcccesor.lift(v[1])).read(end, dv);
+					end = i;
+				}
+
+				if (v[1] === "dict") {
+					const [_, i] = JsonDataAcccesor.jsonScalar.repeat(JsonDataAcccesor.lift(v[1].length)).read(end, dv);
+					end = i;
+				}
+			}
+
+			return [dv.slice(idx, end) as [AnyJsonSpineAtom, ...AnyJsonSpineAtom[]], end];
+		},
+		(idx, v) => {
+			return [idx + v.length, (dv) => {
+				v.forEach((v, i) => dv[idx + i] = v)
+			}];
+		},
+		[undefined]
+	)
+
+	static jsonArray<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<JsonResult<T>[]>> {
+		return JsonDataAcccesor.readChunk(["array", 0]).then(cnt =>
+				joinLeftRight<DataAccessor<JsonResult<T>[], JsonSpine>, JsonErrorResult, JsonDataAcccesor<JsonResult<JsonResult<T>[]>>>(
+					mapRight(cnt, cnt => v.repeat(JsonDataAcccesor.lift(cnt))),
+					value => value.map(v => right(v), v => joinLeftRight(v, r => r, e => [])),
+					err => JsonDataAcccesor.lift(left<JsonErrorResult, any>(err)),
+				),
+				v => mapRight(v, (v) => v.length),
+			);
+	}
+
+	static jsonDict<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<Record<string, JsonResult<T>>>> {
+		return JsonDataAcccesor.readChunk(["dict", []]).then(keys =>
+				joinLeftRight<DataAccessor<JsonResult<T>[], JsonSpine>, JsonErrorResult, JsonDataAcccesor<JsonResult<Record<string, JsonResult<T>>>>>(
+					mapRight(keys, keys => v.repeat(JsonDataAcccesor.lift(keys.length))),
+					value => value
+						.map<Record<string, JsonResult<T>>>(values => Object.fromEntries(values.map((v, i) => [keys[i], v])), o => Object.values(o))
+						.map(v => right(v), v => joinLeftRight(v, r => r, e => ({}))),
+					err => JsonDataAcccesor.lift(left<JsonErrorResult, any>(err)),
+				),
+			v => mapRight(v, (v) => Object.keys(v)),
+		);
+	}
+
+	// static obj<O extends Record<string, DataAccessor<any, any>>>(o: O): DataAccessor<UnwrapAccessorRecord<O>, UnwrapAccessorRecordView<O>> {
+	// 	return DataAccessor.array<any, UnwrapAccessorRecordView<O>>(Object.keys(o).map(k => DataAccessor.tuple(DataAccessor.lift(k), o[k])))
+	// 		.map<any>(pairs => Object.fromEntries(pairs), obj => Object.keys(o).map(k => [k, obj[k]]));
+	// }
+
+	static jsonObj<O extends Record<string, JsonDataAcccesor<JsonResult<any>>>>(o: O): JsonDataAcccesor<JsonResult<UnwrapAccessorRecord<O>>> {
+		return JsonDataAcccesor.readChunk(["dict", []]).then(keys => {
+			return joinLeftRight<string[], JsonErrorResult, JsonDataAcccesor<JsonResult<UnwrapAccessorRecord<O>>>>(keys,
+				keys => {
+					const fields: JsonDataAcccesor<JsonResult<any>>[] = [];
+					const missing = {...o};
+
+					for (let k of keys) {
+						if (k in o) {
+							fields.push(o[k]);
+							delete missing[k];
+						} else {
+							fields.push(
+								JsonDataAcccesor.jsonScalar.map(s => left<JsonErrorResult, JsonScalar>([s, ["extra_key", k]]), (v) => joinLeftRight(v, r => [null], ([l]) => l))
+							);
+						}
+					}
+
+					for (let k in missing) {
+						fields.push(
+							JsonDataAcccesor.lift(left<JsonErrorResult, JsonScalar>([[undefined], ["extra_key", k]]))
+						);
+					}
+
+					return JsonDataAcccesor.tuple(...fields)
+				},
+				err => JsonDataAcccesor.lift(left<number, UnwrapAccessorRecord<O>>(err))
+			)
+		}, (maybeParts) => {
+			return mapRight(maybeParts, parts => Object.keys(parts));
+		})
+	}
+	//
+	// static jsonObj<T>(v: JsonDataAcccesor<Either<T, number>>): JsonDataAcccesor<Either<Record<string, T>, number>> {
+	// 	return JsonDataAcccesor.readChunk(["dict", []]).then(keys => {
+	// 		return joinLeftRight<string[], number, JsonDataAcccesor<Either<Record<string, T>, number>>>(keys,
+	// 			keys => v.repeat(JsonDataAcccesor.lift(keys.length)).map(accUntilLeft, values => joinLeftRight<T[], number, Either<T, number>[]>(
+	// 				values,
+	// 				values => values.map(v => right<T, number>(v)),
+	// 				err => [left(err)],
+	// 			)).map(values => mapRight(values, values => Object.fromEntries(values.map((v, i) => [keys[i], v] as [string, T]))),
+	// 				o => mapRight(o, o => Object.values(o))),
+	// 			err => JsonDataAcccesor.lift(left<number, Record<string, T>>(err))
+	// 		)
+	// 	}, (maybeParts) => {
+	// 		return mapRight(maybeParts, parts => Object.keys(parts));
+	// 	})
+	// }
+}
+
+export const jsonString = JsonDataAcccesor.readChunk(["string", ""])
+export const jsonNumber = JsonDataAcccesor.readChunk(["number", 0])
+export const jsonBoolean = JsonDataAcccesor.readChunk(["boolean", false])
+export const jsonUndefined = JsonDataAcccesor.readChunk(undefined);
+export const jsonNull = JsonDataAcccesor.readChunk(null);
