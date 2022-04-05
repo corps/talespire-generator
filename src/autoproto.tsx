@@ -33,6 +33,7 @@ type UnwrapAccessorRecord<T extends Record<string, DataAccessor<any, any>>> = {
 type UnwrapAccessorRecordView<T extends Record<string, DataAccessor<any, any>>> = T extends Record<string, DataAccessor<any, infer View>> ? View : unknown;
 
 export type UnwrapAccessor<T extends DataAccessor<any, any>> = T extends DataAccessor<infer O, any> ? O : never;
+export type UnwrapAccessorView<T extends DataAccessor<any, any>> = T extends DataAccessor<any, infer View> ? View : never;
 
 function fillOut(bits: number) {
 	return (1 << bits) - 1;
@@ -229,6 +230,10 @@ export class DataAccessor<State, View> {
 			.map<any>(pairs => Object.fromEntries(pairs), obj => Object.keys(o).map(k => [k, obj[k]]));
 	}
 
+	static group<P extends DataAccessor<any, any>>(accessors: P[]): DataAccessor<UnwrapAccessor<P>[], UnwrapAccessorView<P>> {
+		return DataAccessor.tuple(...accessors) as any;
+	}
+
 	static tuple<P extends DataAccessor<any, any>[]>(...accessors: P): DataAccessor<UnwrapAccessorTuple<P>, UnwrapAccessorTupleView<P>> {
 		return new DataAccessor<UnwrapAccessorTuple<P>, UnwrapAccessorTupleView<P>>((idx, dv) => {
 			const result: any[] = [];
@@ -418,13 +423,10 @@ type JsonErrorResult = [JsonScalar, JsonError];
 type JsonResult<T> = Either<T, JsonErrorResult>
 
 
-// jsonScalar => 1:1 what you give
-// left => the actual scalar
-// right => the head? scalar only
-
 class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
-	static readChunk<T extends JsonSpineType>(example: JsonSpineAtom<T>) {
-		return JsonDataAcccesor.jsonScalar.then((scalar, start) => {
+	static readChunk<T extends JsonSpineType>(example: JsonSpineAtom<T>): JsonDataAcccesor<JsonResult<JsonSpineValue<T>>> {
+		const {jsonScalar, lift} = JsonDataAcccesor;
+		return jsonScalar.then((scalar, start) => {
 				const [head] = scalar;
 				if (Array.isArray(head)) {
 					if (Array.isArray(example)) {
@@ -444,7 +446,7 @@ class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 					);
 				}
 
-			return JsonDataAcccesor.lift(left<[JsonScalar, JsonError], JsonSpineValue<T>>([scalar, "invalid_type"]));
+			return lift(left<[JsonScalar, JsonError], JsonSpineValue<T>>([scalar, "invalid_type"]));
 		}, res => joinLeftRight(res, head => {
 			if (Array.isArray(example)) {
 				return [[example[0], head]] as JsonScalar
@@ -464,16 +466,17 @@ class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 
 	static jsonScalar = new JsonDataAcccesor<JsonScalar>(
 		(idx, dv) => {
+			const {jsonScalar, lift} = JsonDataAcccesor;
 			const v = dv[idx];
 			let end = idx + 1;
 			if (Array.isArray(v)) {
 				if (v[0] === "array") {
-					const [_, i] = JsonDataAcccesor.jsonScalar.repeat(JsonDataAcccesor.lift(v[1])).read(end, dv);
+					const [_, i] = jsonScalar.repeat(lift(v[1])).read(end, dv);
 					end = i;
 				}
 
 				if (v[1] === "dict") {
-					const [_, i] = JsonDataAcccesor.jsonScalar.repeat(JsonDataAcccesor.lift(v[1].length)).read(end, dv);
+					const [_, i] = jsonScalar.repeat(lift(v[1].length)).read(end, dv);
 					end = i;
 				}
 			}
@@ -488,83 +491,81 @@ class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 		[undefined]
 	)
 
+	static liftSuccess<T>(t: JsonDataAcccesor<T>): JsonDataAcccesor<JsonResult<T>> {
+		const {joinWith} = JsonDataAcccesor;
+		return joinWith(right(t));
+	}
+
+	static liftError<T = any>(err: JsonErrorResult): JsonDataAcccesor<JsonResult<T>> {
+		const {joinWith} = JsonDataAcccesor;
+		return joinWith(left<JsonErrorResult, any>(err));
+	}
+
+	static joinWith<T>(r: JsonResult<JsonDataAcccesor<T>>): JsonDataAcccesor<JsonResult<T>> {
+		const {lift} = JsonDataAcccesor;
+		return joinLeftRight<JsonDataAcccesor<T>, JsonErrorResult, JsonDataAcccesor<JsonResult<T>>>(
+			r,
+			accessor => accessor.map(
+				result => right(result),
+				result => joinLeftRight(result, v => v, err => accessor.d),
+			),
+			err => lift(left(err))
+		)
+	}
+
 	static jsonArray<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<JsonResult<T>[]>> {
+		const {lift, joinWith} = JsonDataAcccesor;
 		return JsonDataAcccesor.readChunk(["array", 0]).then(cnt =>
-				joinLeftRight<DataAccessor<JsonResult<T>[], JsonSpine>, JsonErrorResult, JsonDataAcccesor<JsonResult<JsonResult<T>[]>>>(
-					mapRight(cnt, cnt => v.repeat(JsonDataAcccesor.lift(cnt))),
-					value => value.map(v => right(v), v => joinLeftRight(v, r => r, e => [])),
-					err => JsonDataAcccesor.lift(left<JsonErrorResult, any>(err)),
-				),
+				joinWith(mapRight(cnt, cnt => v.repeat(lift(cnt)))),
 				v => mapRight(v, (v) => v.length),
 			);
 	}
 
 	static jsonDict<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<Record<string, JsonResult<T>>>> {
-		return JsonDataAcccesor.readChunk(["dict", []]).then(keys =>
-				joinLeftRight<DataAccessor<JsonResult<T>[], JsonSpine>, JsonErrorResult, JsonDataAcccesor<JsonResult<Record<string, JsonResult<T>>>>>(
-					mapRight(keys, keys => v.repeat(JsonDataAcccesor.lift(keys.length))),
-					value => value
-						.map<Record<string, JsonResult<T>>>(values => Object.fromEntries(values.map((v, i) => [keys[i], v])), o => Object.values(o))
-						.map(v => right(v), v => joinLeftRight(v, r => r, e => ({}))),
-					err => JsonDataAcccesor.lift(left<JsonErrorResult, any>(err)),
-				),
+		const {readChunk, lift, joinWith} = JsonDataAcccesor;
+		return readChunk(["dict", []]).then(keys =>
+			joinWith(mapRight(keys,
+					keys => v
+						.repeat(lift(keys.length))
+						.map<Record<string, JsonResult<T>>>(
+							values => Object.fromEntries(values.map((v, i) => [keys[i], v])),
+							o => Object.values(o)
+						))),
 			v => mapRight(v, (v) => Object.keys(v)),
 		);
 	}
 
-	// static obj<O extends Record<string, DataAccessor<any, any>>>(o: O): DataAccessor<UnwrapAccessorRecord<O>, UnwrapAccessorRecordView<O>> {
-	// 	return DataAccessor.array<any, UnwrapAccessorRecordView<O>>(Object.keys(o).map(k => DataAccessor.tuple(DataAccessor.lift(k), o[k])))
-	// 		.map<any>(pairs => Object.fromEntries(pairs), obj => Object.keys(o).map(k => [k, obj[k]]));
-	// }
-
 	static jsonObj<O extends Record<string, JsonDataAcccesor<JsonResult<any>>>>(o: O): JsonDataAcccesor<JsonResult<UnwrapAccessorRecord<O>>> {
-		return JsonDataAcccesor.readChunk(["dict", []]).then(keys => {
-			return joinLeftRight<string[], JsonErrorResult, JsonDataAcccesor<JsonResult<UnwrapAccessorRecord<O>>>>(keys,
-				keys => {
-					const fields: JsonDataAcccesor<JsonResult<any>>[] = [];
-					const missing = {...o};
+		const {lift, group, jsonScalar, joinWith, tuple} = JsonDataAcccesor;
+		return JsonDataAcccesor.readChunk(["dict", []]).then(keys =>
+			joinWith(mapRight<string[], JsonDataAcccesor<UnwrapAccessorRecord<O>>, JsonErrorResult>(keys, keys => {
+				const fields: JsonDataAcccesor<[string, JsonResult<any>]>[] = [];
+				const missing = {...o};
 
-					for (let k of keys) {
-						if (k in o) {
-							fields.push(o[k]);
-							delete missing[k];
-						} else {
-							fields.push(
-								JsonDataAcccesor.jsonScalar.map(s => left<JsonErrorResult, JsonScalar>([s, ["extra_key", k]]), (v) => joinLeftRight(v, r => [null], ([l]) => l))
-							);
-						}
-					}
-
-					for (let k in missing) {
+				keys.forEach(k => {
+					if (k in o) {
+						fields.push(tuple(lift(k), o[k]));
+						delete missing[k];
+					} else {
 						fields.push(
-							JsonDataAcccesor.lift(left<JsonErrorResult, JsonScalar>([[undefined], ["extra_key", k]]))
+							jsonScalar.map(s => [k, left<JsonErrorResult, any>([s, ["extra_key", k]])],
+								(v) => joinLeftRight(v[1], r => [null], ([l]) => l))
 						);
 					}
+				})
 
-					return JsonDataAcccesor.tuple(...fields)
-				},
-				err => JsonDataAcccesor.lift(left<number, UnwrapAccessorRecord<O>>(err))
-			)
-		}, (maybeParts) => {
+				Object.keys(missing).forEach(k => {
+					fields.push(
+						jsonScalar.map(s => [k, left<JsonErrorResult, any>([s, ["missing_key", k]])],
+							(v) => joinLeftRight(v[1], r => [null], ([l]) => l))
+					);
+				});
+
+				return group(fields).map(entries => Object.fromEntries(entries) as UnwrapAccessorRecord<O>, o => Object.entries(o));
+			})), (maybeParts) => {
 			return mapRight(maybeParts, parts => Object.keys(parts));
 		})
 	}
-	//
-	// static jsonObj<T>(v: JsonDataAcccesor<Either<T, number>>): JsonDataAcccesor<Either<Record<string, T>, number>> {
-	// 	return JsonDataAcccesor.readChunk(["dict", []]).then(keys => {
-	// 		return joinLeftRight<string[], number, JsonDataAcccesor<Either<Record<string, T>, number>>>(keys,
-	// 			keys => v.repeat(JsonDataAcccesor.lift(keys.length)).map(accUntilLeft, values => joinLeftRight<T[], number, Either<T, number>[]>(
-	// 				values,
-	// 				values => values.map(v => right<T, number>(v)),
-	// 				err => [left(err)],
-	// 			)).map(values => mapRight(values, values => Object.fromEntries(values.map((v, i) => [keys[i], v] as [string, T]))),
-	// 				o => mapRight(o, o => Object.values(o))),
-	// 			err => JsonDataAcccesor.lift(left<number, Record<string, T>>(err))
-	// 		)
-	// 	}, (maybeParts) => {
-	// 		return mapRight(maybeParts, parts => Object.keys(parts));
-	// 	})
-	// }
 }
 
 export const jsonString = JsonDataAcccesor.readChunk(["string", ""])
