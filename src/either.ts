@@ -2,11 +2,11 @@ import {isSome, Maybe} from "./maybe";
 
 export type Either<R, L> = [R] | [null, L];
 
-export function right<V, G = unknown>(r: V): Either<V, G> {
+export function right<V, G = any>(r: V): Either<V, G> {
 	return [r];
 }
 
-export function left<V, G = unknown>(l: V): Either<G, V> {
+export function left<V, G = any>(l: V): Either<G, V> {
 	return [null, l];
 }
 

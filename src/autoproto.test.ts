@@ -1,6 +1,15 @@
-import {BitView, JsonDataAcccesor, jsonAny, jsonEncoder, jsonNumber, jsonUndefined, jsonBoolean, jsonString, jsonNull} from "./autoproto";
-import {right} from "./either";
-const {jsonObj, jsonDict, jsonArray, jsonScalar} = JsonDataAcccesor;
+import {
+	BitView,
+	JsonDataAcccesor,
+	jsonAny,
+	jsonNumber,
+	jsonUndefined,
+	jsonBoolean,
+	jsonString,
+	jsonNull, JsonErrorResult
+} from "./autoproto";
+import {left, right} from "./either";
+const {jsonObj, jsonDict, jsonArray, jsonScalar, jsonTuple, unwrap, fillOut} = JsonDataAcccesor;
 
 function testJsonAccessor<V>(accessor: JsonDataAcccesor<V>, v: V, expected: any = v) {
 	const encoded = accessor.encode(v, (s) => new Array(s));
@@ -14,30 +23,61 @@ describe('JsonDataAccessor', () => {
 			testJsonAccessor(jsonScalar, [["array", 2], ["number", 3], ["number", 6]])
 		})
 	})
+
 	describe('jsonString', () => {
 		it('works', () => {
 			testJsonAccessor(jsonString, right("hello"))
 		})
 	})
+
+	describe('jsonNull', () => {
+		it('works', () => {
+			testJsonAccessor(jsonNull, right(null))
+		})
+	})
+
+	describe('jsonArray', () => {
+		it('works', () => {
+			testJsonAccessor(jsonArray(jsonString), right([right("a"), right("b"), right("c")]));
+		})
+	});
+
+	describe('jsonDict', () => {
+		it('works', () => {
+			testJsonAccessor(jsonDict(jsonString), right({a: right("a"), b: right("b"), c: right("c") }));
+			testJsonAccessor(jsonDict(jsonString),
+				right({a: left<JsonErrorResult, string>([[["string", "a"]], "invalid_type"]), b: right("b"), c: right("c") }),
+				right({a: right("a"), b: right("b"), c: right("c") }));
+		})
+	});
+
 	describe('a complex example', () => {
 		it('works', () => {
 			const reader = jsonObj({
-				version: jsonNumber,
+				version: jsonTuple(jsonNumber, jsonString),
 				elements: jsonArray(jsonArray(jsonDict(jsonObj({
 					a: jsonString,
 					b: jsonNull,
 				}))))
-			})
+			});
+
 			const value = {
-				version: 12,
+				version: [12, "asdf"],
 				elements: [[], [{}, {vv: {a: "asdf", b: null}}]]
 			};
-			const spine = jsonEncoder.encode(value, (v) => new Array(v));
 
-			const decoded = reader.decode(spine, spine.length);
-			expect(decoded).toEqual({});
+			const spine = jsonAny.encode(value, (v) => new Array(v));
+			const decoded = unwrap(reader.decode(spine, spine.length));
+			const version = unwrap(decoded.version);
+			const elements = unwrap(decoded.elements);
+
+			expect(unwrap(version[0])).toEqual(value.version[0])
+			expect(unwrap(version[1])).toEqual(value.version[1])
+			expect(elements.map(unwrap).map(e => e.map(unwrap))).toEqual([
+				[],
+				[{}, {vv: right({a: right("asdf"), b: right(null)})}]
+			])
 		})
-
 	})
 })
 
