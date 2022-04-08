@@ -1,16 +1,33 @@
-import React, {useMemo} from 'react';
-import {deflate, ungzip} from "pako";
+import React, {useEffect, useMemo, useState} from 'react';
+import {Box, Container} from "@mui/material";
+import {SlabPreview} from "./SlabPreview";
+import {AutoInput, useAutoInput} from "./autoinputs";
+import {SlabInput} from "./SlabInput";
+import {useLocalStorage} from "./useLocalStorage";
+import {AssetLibraryInput} from "./AssetLibraryInput";
 
+
+const Editor = AutoInput.apply(
+	SlabInput,
+	AssetLibraryInput
+)
+
+const noop = () => null;
 function App() {
-	const [SlabInput, value] = useTap(useMemo(() => build(AutoMultilineString).bind("").map(decodeSlab).Input, []));
+	const [defaultSlabJson, setSlabJson] = useLocalStorage(Editor.defaultState, 'slab');
+	const [slabJson, slab, pasteSlabInput] = useAutoInput(Editor, noop, defaultSlabJson);
+	useEffect(() => setSlabJson(slabJson), [setSlabJson, slabJson]);
 
-	return (<div className="mw7 center pa4">
-			<SlabInput onChange={noop}/>
-			<textarea value={value}
-								readOnly
-								className="input-reset ba b--black-20 pa2 mb2 db w-100"
-			/>
-		</div>);
+	return (
+		<Container>
+			<Box>
+				{pasteSlabInput}
+			</Box>
+			<Box>
+				{/*<SlabPreview slab={slab}/>*/}
+			</Box>
+		</Container>
+	)
 }
 
 export default App;

@@ -26,14 +26,16 @@ export const header = obj({
 	magic: uint32.withDefault(MAGIC), version: uint16.withDefault(2),
 });
 
+// NOTE -- the first 32bit word, and the 2nd and the 3rd 16bit words, are little endian encoded, thus
+// we need to process them in reverse.  The last 8 bytes are arbitrary and do not respect endianness.
 export const uuid = tuple(tuple(hexDigit, hexDigit, hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit),
-).map(parts => parts.map(s => s.join('')).join('-'), s => [
-	[s.slice(0, 2), s.slice(2, 4), s.slice(4, 6), s.slice(6, 8)],
-	[s.slice(9, 11), s.slice(11, 13)],
-	[s.slice(14, 16), s.slice(16, 18)],
+).map(parts => [parts[0].reverse().join(''), parts[1].reverse().join(''), parts[2].reverse().join(''), parts[3].join('')].join('-'), s => [
+	[s.slice(6, 8), s.slice(4, 6), s.slice(2, 4), s.slice(0, 2)],
+	[s.slice(11, 13), s.slice(9, 11)],
+	[s.slice(16, 18), s.slice(14, 16)],
 	[s.slice(19, 21), s.slice(21, 23), s.slice(23, 25), s.slice(25, 27), s.slice(27, 29), s.slice(29, 31), s.slice(31, 33), s.slice(33, 35)]
 ])
 
@@ -81,5 +83,3 @@ export const slab = header.then(({magic, version}) => {
 			throw new Error(`Invalid slab, unknown version ${version}`)
 	}
 }, ({version}) => ({version, magic: MAGIC}))
-
-export type Slab = typeof slab.d;

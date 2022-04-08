@@ -439,14 +439,14 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 				);
 			}
 
-			return lift(left<[JsonScalar, JsonError], JsonSpineValue<T>>([scalar, "invalid_type"]));
+			return lift(left<JsonErrorResult, JsonSpineValue<T>>([scalar, "invalid_type"]));
 		}, res => joinLeftRight(res, head => {
 			if (Array.isArray(example)) {
 				return [[example[0], head]] as JsonScalar
 			}
 
 			return [head] as JsonScalar;
-		}, ([scalar]) => scalar));
+		}, ([scalar]) => scalar)).withDefault(right(JsonDataAcccesor.defaultFor(example)));
 	}
 
 	static defaultFor<T extends JsonSpineType>(v: JsonSpineAtom<T>): JsonSpineValue<T> {
@@ -524,7 +524,7 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 					cnt => {
 						const fields = o.slice(0, cnt);
 						for (let i = fields.length; i < o.length; ++i) {
-							fields.push(lift(left<JsonErrorResult, any>([joinLeftRight(o[i].d, v => v, e => [null]), ["missing_key", i + ""]])));
+							fields.push(lift(left<JsonErrorResult, any>([jsonAny.encode(joinLeftRight(o[i].d, v => v, e => null), (size) => new Array(size)) as JsonScalar, ["missing_key", i + ""]])));
 						}
 						for (let i = fields.length; i < cnt; ++i) {
 							fields.push(jsonScalar.map(s => left<JsonErrorResult, any>([s, ["extra_key", i + ""]]),
@@ -557,7 +557,10 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 					})
 
 					Object.keys(missing).forEach(k => {
-						fields.push(lift([k, left<JsonErrorResult, any>([joinLeftRight(o[k].d, v => v, e => [null]), ["missing_key", k]])]));
+						fields.push(lift([k, left<JsonErrorResult, any>([
+							jsonAny.encode(joinLeftRight(o[k].d, v => v, e => null), (size) => new Array(size)) as JsonScalar,
+							["missing_key", k]
+						])]));
 					});
 
 					return group(fields)
@@ -601,6 +604,7 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 		return joinLeftRight(v, a => a, ([node, err]) => {
 			if (Array.isArray(err)) {
 				if (err[0] === "missing_key") return jsonAny.decode(node);
+				if (err[0] === "extra_key") return jsonAny.decode(node);
 			}
 			return handleInvalid(v);
 		})

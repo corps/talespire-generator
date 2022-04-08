@@ -10,7 +10,7 @@ help: ## Display help text
 .PHONY: run
 run: image.marker ## Runs the development server
 	docker run --rm -it -v $$(pwd):/app talespire-generator npm install
-	docker run --rm -it -v $$(pwd):/app talespire-generator
+	docker run --rm -it -p 3000:3000 -v $$(pwd):/app talespire-generator
 
 .PHONY: bash
 bash: image.marker ## Opens a bash environment for development

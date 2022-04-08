@@ -15,6 +15,12 @@ export function mapRight<A, B, G>(v: Either<A, G>, f: (a: A) => B): Either<B, G>
 	return v;
 }
 
+export function mapLeft<A, B, G>(v: Either<A, G>, f: (b: G) => B): Either<A, B> {
+	if (v.length === 2) return [null, f(v[1])];
+	return v;
+}
+
+
 export function accUntilLeft<A, B>(v: Either<A, B>[]): Either<A[], B> {
 	const result: A[] = [];
 	for (let i = 0; i < v.length; ++i) {
@@ -62,4 +68,15 @@ export function applyRight<A, B, G>(f: Either<(a: A) => B, G>, a: Either<A, G>):
 export function flipLeftRight<A, B>(a: Either<A, B>): Either<B, A> {
 	if (a.length === 2) return [a[1]]
 	return [null, a[0]];
+}
+
+export function catchErr<A, T>(t: (a: A) => T): (a: A) => Either<T, string> {
+	return (a: A) => {
+		try {
+			return right(t(a));
+		} catch (e) {
+			console.error(e)
+			return left(e + "")
+		}
+	}
 }
