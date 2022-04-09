@@ -1,9 +1,11 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
+import {createRoot} from "react-dom/client";
 
-ReactDOM.render(
+const root = createRoot(document.getElementById('root') as any);
+
+root.render(
   <React.StrictMode>
 		<link
 			rel="stylesheet"
@@ -16,5 +18,4 @@ ReactDOM.render(
 		<meta name="viewport" content="initial-scale=1, width=device-width" />
 		<App />
   </React.StrictMode>,
-  document.getElementById('root')
 );

@@ -467,7 +467,7 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 				end = i;
 			}
 
-			if (v[1] === "dict") {
+			if (v[0] === "dict") {
 				const [_, i] = jsonScalar.repeat(lift(v[1].length)).read(end, dv);
 				end = i;
 			}
@@ -556,8 +556,9 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 							fields.push(tuple(lift(k), o[k]));
 							delete missing[k];
 						} else {
-							fields.push(jsonScalar.map(s => [k, left<JsonErrorResult, any>([s, ["extra_key", k]])],
-								(v) => joinLeftRight<any, JsonErrorResult, JsonScalar>(r => [null], ([l]) => l)(v[1])
+							fields.push(jsonScalar.map(
+								s => [k, left<JsonErrorResult, any>([s, ["extra_key", k]])],
+								(v) => joinLeftRight<any, JsonErrorResult, JsonScalar>(r => jsonAny.encode(r, s => new Array(s)) as JsonScalar, ([l]) => l)(v[1])
 							));
 						}
 					})
@@ -597,20 +598,20 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 		}
 	}
 
-	static unwrap<T>(v: JsonResult<T>): T {
+	static unwrap<T>(v: JsonResult<T>, context = ""): T {
 		const {errorToString} = JsonDataAcccesor;
 		return joinLeftRight<T, JsonErrorResult, T>(a => a, ([node, err]) => {
-			throw new Error(`Json did not match schema, error at ${JSON.stringify(jsonAny.decode(node))}: ${errorToString(err)}`)
+			throw new Error(`Json did not match schema, error at ${JSON.stringify(jsonAny.decode(node))}${context ? " " + context : ""}: ${errorToString(err)}`)
 		})(v);
 	}
 
-	static fillOut<T>(v: JsonResult<T>, handleInvalid = JsonDataAcccesor.unwrap): T {
+	static fillOut<T>(v: JsonResult<T>, context = "", handleInvalid = JsonDataAcccesor.unwrap): T {
 		return joinLeftRight<T, JsonErrorResult, T>(a => a, ([node, err]) => {
 			if (Array.isArray(err)) {
 				if (err[0] === "missing_key") return jsonAny.decode(node);
 				if (err[0] === "extra_key") return jsonAny.decode(node);
 			}
-			return handleInvalid(v);
+			return handleInvalid(v, context);
 		})(v)
 	}
 }

@@ -3,7 +3,7 @@ import {Canvas} from "@react-three/fiber";
 import Color from 'color';
 import { V3 } from './vector';
 import {Slab} from "./slabFromText";
-import {Grid, Tab, Tabs, TextField} from "@mui/material";
+import {TextField} from "@mui/material";
 import {TabSet} from "./TabSet";
 import {compress, slab as slabAccessor} from './slab-decoder'
 
@@ -35,20 +35,19 @@ export function SlabPreview({slab}: Props) {
 	const {assets} = slab;
 
 	const preview = <Canvas>
-		{/*<ambientLight intensity={0.5} />*/}
-		{/*<spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />*/}
-		{/*{slab.assets.map((asset, i) =>*/}
-		{/*	<AssetBlock key={i + ""} center={asset.center} extent={asset.extents} color={assetColorings[asset.id].hex()}/>*/}
-		{/*)}*/}
+		<ambientLight intensity={0.5} />
+		<spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
+		{slab.assets.map((asset, i) =>
+			<AssetBlock key={i + ""} center={asset.center} extent={asset.extents} color={assetColorings[asset.id].hex()}/>
+		)}
 	</Canvas>
-	return preview;
 
-	// const serialized = useMemo(() => {
-	// 	return compress(slabAccessor.encode(slab.toV2Slab(assets), (size) => new DataView(new Uint8Array(size).buffer)));
-	// }, [assets, slab])
+	const serialized = useMemo(() => {
+		return compress(slabAccessor.encode(slab.toV2Slab(assets), (size) => new DataView(new Uint8Array(size).buffer)));
+	}, [assets, slab])
 
-	// const source = <TextField aria-readonly disabled value={serialized}/>;
-	// return <TabSet options={{preview, source}}/>
+	const source = <TextField aria-readonly disabled value={serialized}/>;
+	return <TabSet options={{preview, source}}/>
 }
 
 interface BoxProps {

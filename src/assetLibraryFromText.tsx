@@ -8,15 +8,15 @@ const {fillOut} = JsonDataAcccesor;
 
 export const assetLibraryFromText = jsonFromText.map(bindRight(catchErr(v => assetDb.decode(v))))
 	.map(bindRight(catchErr(parsedLibrary => {
-		const library = fillOut(parsedLibrary);
+		const library = fillOut(parsedLibrary, "(top level object)");
 		const result: AssetLibrary = {};
 
-		fillOut(library.Tiles).forEach(parsedTile => {
+		fillOut(library.Tiles, "(.Tiles)").forEach(parsedTile => {
 			const asset = Asset.fromPlaceable(parsedTile, false);
 			result[asset.id] = asset;
 		})
 
-		fillOut(library.Props).forEach(parsedTile => {
+		fillOut(library.Props, "(.Props)").forEach(parsedTile => {
 			const asset = Asset.fromPlaceable(parsedTile, true);
 			result[asset.id] = asset;
 		})
@@ -30,12 +30,12 @@ export class Asset {
 	constructor(public center: V3, public extents: V3, public rot: number, public name: string, public id: string, public isProp: boolean) {}
 
 	static fromPlaceable(p: typeof placeable.d, isMini: boolean): Asset {
-		const obj = fillOut(p);
-		const bounds = fillOut(obj.ColliderBoundsBound);
-		const extent = fillOut(bounds.m_Extent);
-		const center = fillOut(bounds.m_Center);
+		const obj = fillOut(p, "(.Props[x])");
+		const bounds = fillOut(obj.ColliderBoundsBound, "(.Props[x].ColliderBoundsBound)");
+		const extent = fillOut(bounds.m_Extent, "(.Props[x].ColliderBoundsBound.m_Extent)");
+		const center = fillOut(bounds.m_Center, "(.Props[x].ColliderBoundsBound.m_Center)");
 		return new Asset(
-			new V3(fillOut(center.x), fillOut(center.y), fillOut(center.z)),
+			new V3(fillOut(center.x, "(.Props[x].ColliderBoundsBound.m_Center.x)"), fillOut(center.y, "(.Props[x].ColliderBoundsBound.m_Center.y)"), fillOut(center.z, "(.Props[x].ColliderBoundsBound.m_Center.z)")),
 			new V3(fillOut(extent.x), fillOut(extent.y), fillOut(extent.z)),
 			0,
 			fillOut(obj.Name),

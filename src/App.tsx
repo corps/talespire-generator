@@ -5,30 +5,27 @@ import {Slab, slabFromText} from "./slabFromText";
 import {useLocalStorage} from "./useLocalStorage";
 import {assetLibraryFromText} from "./assetLibraryFromText";
 import {useAutoMemo} from "./automemo";
-import {bindValue} from "./autoinputs";
-import {TextInput} from "./TextInput";
+import {bindParams, useBoundInput} from "./autoinputs";
+import {TextInput} from "./inputs";
 import {bindRight, mapRight} from "./either";
-import {ShowError, ShowResult} from "./WithError";
+import {ShowResult} from "./WithError";
+
+const SlabInput = bindParams(TextInput, {label: "Slab"});
+const LibraryInput = bindParams(TextInput, {label: "Asset Library (index.json)"});
 
 function App() {
-	const [slabInput, slabText] = bindValue(TextInput,
-		...useLocalStorage(slabFromText.defaultState, 'pastedSlab'));
-	const [libraryInput, libraryText] = bindValue(TextInput,
-		...useLocalStorage(assetLibraryFromText.defaultState, 'assetLibrary'));
+	const [slabInput, slabText, _, slabFromAssetLibrary] = useBoundInput(SlabInput,
+		...useLocalStorage(slabFromText.defaultState, 'pastedSlab'), slabFromText);
+	const [libraryInput, libraryText, __, assetLibrary] = useBoundInput(LibraryInput,
+		...useLocalStorage(assetLibraryFromText.defaultState, 'assetLibrary'), assetLibraryFromText);
 
-	const slabFromAssetLibrary = useAutoMemo(slabFromText, slabText);
-	const assetLibrary = useAutoMemo(assetLibraryFromText, libraryText);
 	const slab = bindRight(f => mapRight(p => f(p), assetLibrary), slabFromAssetLibrary);
 
 	return (
 		<Container>
 			<Box>
 				{slabInput}
-				<ShowError value={slabFromAssetLibrary}/>
-			</Box>
-			<Box>
 				{libraryInput}
-				<ShowError value={assetLibrary}/>
 			</Box>
 			<Box>
 				<ShowResult value={mapRight(slab => <SlabPreview slab={slab}/>, slab)}/>

@@ -1,13 +1,29 @@
 import React, {Dispatch, FC} from "react";
+import {AutoMemo, useAutoMemo} from "./automemo";
+import {Either, joinLeftRight} from "./either";
 
 export type FCWithValue<T> = FC<{value: T}>
-export type FCWithOnChange<T> = FC<{value: T, onChange: Dispatch<T>}>
+export type FCWithOnChange<T> = FC<{value: T, onChange: Dispatch<T>, error?: string}>
 
 export function bindParams<P>(C: FC<P>, p: Partial<P>): FC<P> {
 	return (pp: P) => <C {...{...pp, ...p}}/>
 }
 
-export function bindValue<V>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>): [React.ReactElement | null, V, Dispatch<V>] {
+export function useBoundInput<V>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>): [React.ReactElement | null, V, Dispatch<V>, undefined];
+export function useBoundInput<V, O>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>, memo: AutoMemo<V, Either<O, string>>): [React.ReactElement | null, V, Dispatch<V>, Either<O, string>];
+export function useBoundInput<V, O=unknown>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>, memo?: AutoMemo<V, Either<O, string>>): [React.ReactElement | null, V, Dispatch<V>, Either<O, string> | undefined] {
+	let result: any;
+	let error: string | undefined = undefined;
+	if (memo) {
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		let result = useAutoMemo(memo, value)
+		error = joinLeftRight<O, string, string | undefined>(_ => undefined, error => error)(result);
+	}
+
+	return [<F value={value} onChange={onChange} error={error}/>, value, onChange, result];
+}
+
+export function bindValueWithError<V>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>): [React.ReactElement | null, V, Dispatch<V>] {
 	return [<F value={value} onChange={onChange}/>, value, onChange];
 }
 

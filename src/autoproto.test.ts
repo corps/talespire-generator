@@ -11,9 +11,14 @@ import {
 import {left, right} from "./either";
 const {jsonObj, jsonDict, jsonArray, jsonScalar, jsonTuple, unwrap, fillOut} = JsonDataAcccesor;
 
-function testJsonAccessor<V>(accessor: JsonDataAcccesor<V>, v: V, expected: any = v) {
-	const encoded = accessor.encode(v, (s) => new Array(s));
+function testJsonAccessor<V>(accessor: JsonDataAcccesor<V>, v: V, expected: any = v, m: any = undefined) {
+	let encoded = accessor.encode(v, (s) => new Array(s));
 	expect(accessor.decode(encoded, encoded.length)).toEqual(expected);
+	if (m) {
+		encoded = jsonAny.encode(m, (s) => new Array(s));
+		console.log(encoded)
+		expect(accessor.decode(encoded, encoded.length)).toEqual(expected);
+	}
 }
 
 describe('JsonDataAccessor', () => {
@@ -47,9 +52,21 @@ describe('JsonDataAccessor', () => {
 			testJsonAccessor(jsonDict(jsonString), right({a: right("a"), b: right("b"), c: right("c") }));
 			testJsonAccessor(jsonDict(jsonString),
 				right({a: left<JsonErrorResult, string>([[["string", "a"]], "invalid_type"]), b: right("b"), c: right("c") }),
-				right({a: right("a"), b: right("b"), c: right("c") }));
+				right({a: right("a"), b: right("b"), c: right("c") }),
+				{a: "a", b: "b", c: "c"}
+			);
 		})
 	});
+
+	describe('jsonObj', () => {
+		it('works with extra keys', () => {
+			testJsonAccessor(jsonArray(jsonObj({})), right([right({a: right({z: 2, b: 3})}), right({b: right(2)})]),
+				right([
+					right({a: left([[["dict", ["z", "b"]], ["number", 2], ["number", 3]], ["extra_key", "a"]])}),
+					right({b: left([[["number", 2]], ["extra_key", "b"]])}),
+				]), [{a: {z: 2, b: 3}}, {b: 2}]);
+		})
+	})
 
 	describe('a complex example', () => {
 		it('works', () => {

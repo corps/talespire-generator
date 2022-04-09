@@ -1,12 +1,12 @@
 import React from 'react';
 import {decompress, slab, uuid} from "./slab-decoder";
-import {withDefault} from "./maybe";
-import {bindRight, catchErr, compose, mapRight} from "./either";
+import {mapSome, Maybe, withDefault} from "./maybe";
+import {bindRight, catchErr, compose, Either, left, mapRight, right} from "./either";
 import {Asset, AssetLibrary} from "./assetLibraryFromText";
 import {V3} from "./vector";
 import {AutoMemo} from "./automemo";
 
-export const slabFromText = new AutoMemo(catchErr(compose(decompress, withDefault(new DataView(new ArrayBuffer(0))))), "" as string)
+export const slabFromText = new AutoMemo(compose(compose<string, Maybe<DataView>, Maybe<Either<DataView, string>>>(decompress, mapSome(right)), withDefault(left("Invalid gzip"))), "" as string)
  	.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
 	.map(bindRight(catchErr(v2slab => {
 		return (library: AssetLibrary) => {
