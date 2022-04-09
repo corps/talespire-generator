@@ -1,29 +1,25 @@
 import React from 'react';
-import {AutoInput} from "./autoinputs";
 import {decompress, slab, uuid} from "./slab-decoder";
-import {mapSome, withDefault} from "./maybe";
-import {bindRight, catchErr, left, mapLeft} from "./either";
-import {Text} from "./TextAreaInput";
-import {Asset, AssetLibrary} from "./AssetLibraryInput";
+import {withDefault} from "./maybe";
+import {bindRight, catchErr, compose, mapRight} from "./either";
+import {Asset, AssetLibrary} from "./assetLibraryFromText";
 import {V3} from "./vector";
-const {withError} = AutoInput;
+import {AutoMemo} from "./automemo";
 
-export const SlabInput = withError(Text.map(catchErr(decompress)).map(bytes => bindRight(bytes, bytes =>
-	mapLeft(withDefault(mapSome(bytes, catchErr(bytes => slab.decode(bytes, bytes.byteLength))), left("Invalid Slab!")), err => {
-		return "Invalid slab, could not decode."
-	}))
-), slab.d).map(v2slab => {
-	return (library: AssetLibrary) => {
-		const slab = new Slab("<pasted>");
-		v2slab.assets.map(({id, positions}) => {
-			positions.forEach(pos => {
-				slab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
-			});
-		})
+export const slabFromText = new AutoMemo(catchErr(compose(decompress, withDefault(new DataView(new ArrayBuffer(0))))), "" as string)
+ 	.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
+	.map(bindRight(catchErr(v2slab => {
+		return (library: AssetLibrary) => {
+			const slab = new Slab("<pasted>");
+			v2slab.assets.map(({id, positions}) => {
+				positions.forEach(pos => {
+					slab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
+				});
+			})
 
-		return slab;
-	}
-})
+			return slab;
+		}
+	})))
 
 function uuidv4() {
 	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {

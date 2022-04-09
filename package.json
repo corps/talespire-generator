@@ -20,6 +20,7 @@
     "@emotion/react": "^11.8.2",
     "@emotion/styled": "^11.8.1",
     "@mui/material": "^5.5.3",
+    "@react-three/fiber": "^8.0.10",
     "@types/color": "^3.0.3",
     "@types/jest": "^27.4.1",
     "@types/mathjs": "^9.4.2",
@@ -34,7 +35,6 @@
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
-    "react-three-fiber": "^6.0.13",
     "three": "^0.139.2",
     "ts-jest": "^27.1.4",
     "type-fest": "^2.8.0"

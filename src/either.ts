@@ -10,47 +10,49 @@ export function left<V, G = any>(l: V): Either<G, V> {
 	return [null, l];
 }
 
-export function mapRight<A, B, G>(v: Either<A, G>, f: (a: A) => B): Either<B, G> {
-	if (v.length === 1) return [f(v[0])];
-	return v;
+export function mapRight<A, B, G>(f: (a: A) => B): (a: Either<A, G>) => Either<B, G>;
+export function mapRight<A, B, G>(f: (a: A) => B, t: Either<A, G>): Either<B, G>;
+export function mapRight<A, B, G>(f: (a: A) => B, t?: Either<A, G>) {
+	const mapper = (v: Either<A, G>): Either<B, G> => {
+		if (v.length === 1) return [f(v[0])];
+		return v;
+	}
+
+	if (Array.isArray(t)) return mapper(t);
+	return mapper;
 }
 
-export function mapLeft<A, B, G>(v: Either<A, G>, f: (b: G) => B): Either<A, B> {
-	if (v.length === 2) return [null, f(v[1])];
-	return v;
+export function compose<A, B, C>(f: (a: A) => B, g: (b: B) => C): (a: A) => C {
+	return (a: A) => g(f(a));
 }
 
+export function mapLeft<A, B, G>(f: (b: G) => B) {
+	return (v: Either<A, G>): Either<A, B> => {
+		if (v.length === 2) return [null, f(v[1])];
+		return v;
+	}
+}
 
-export function accUntilLeft<A, B>(v: Either<A, B>[]): Either<A[], B> {
-	const result: A[] = [];
-	for (let i = 0; i < v.length; ++i) {
-		const n = v[i];
-		if (n.length === 1) {
-			result.push(n[0]);
-		} else {
-			return left(n[1]);
+export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B) {
+	return (v: Either<A, AA>): B => {
+		if (v.length === 1) return fr(v[0]);
+		return fl(v[1]);
+	}
+}
+
+export function bindRight<A, B, G>(f: (a: A) => Either<B, G>): (a: Either<A, G>) => Either<B, G>;
+export function bindRight<A, B, G>(f: (a: A) => Either<B, G>, t: Either<A, G>): Either<B, G>;
+export function bindRight<A, B, G>(f: (a: A) => Either<B, G>, t?: Either<A, G>) {
+	const mapper = (a: Either<A, G>): Either<B, G> => {
+		if (a.length === 1) {
+			return f(a[0]);
 		}
+
+		return a;
 	}
 
-	return right(result);
-}
-
-export function biMap<A, B, AA, BB>(v: Either<A, AA>, fr: (a: A) => B, fl: (a: AA) => BB): Either<B, BB> {
-	if (v.length === 1) return [fr(v[0])];
-	return [null, fl(v[1])];
-}
-
-export function joinLeftRight<A, AA, B>(v: Either<A, AA>, fr: (a: A) => B, fl: (a: AA) => B): B {
-	if (v.length === 1) return fr(v[0]);
-	return fl(v[1]);
-}
-
-export function bindRight<A, B, G>(a: Either<A, G>, f: (a: A) => Either<B, G>): Either<B, G> {
-	if (a.length === 1) {
-		return f(a[0]);
-	}
-
-	return a;
+	if (Array.isArray(t)) return mapper(t) as any;
+	return mapper as any;
 }
 
 export function applyRight<A, B, G>(f: Either<(a: A) => B, G>, a: Either<A, G>): Either<B, G> {
@@ -65,17 +67,11 @@ export function applyRight<A, B, G>(f: Either<(a: A) => B, G>, a: Either<A, G>):
 	return f;
 }
 
-export function flipLeftRight<A, B>(a: Either<A, B>): Either<B, A> {
-	if (a.length === 2) return [a[1]]
-	return [null, a[0]];
-}
-
 export function catchErr<A, T>(t: (a: A) => T): (a: A) => Either<T, string> {
 	return (a: A) => {
 		try {
 			return right(t(a));
 		} catch (e) {
-			console.error(e)
 			return left(e + "")
 		}
 	}

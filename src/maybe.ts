@@ -1,8 +1,15 @@
 export type Maybe<T> = [T] | null;
 
-export function withDefault<T>(v: Maybe<T>, d: T) {
-	if (v == null) return d;
-	return v[0];
+export function withDefault<T>(d: T): (v: Maybe<T>) => T;
+export function withDefault<T>(d: T, v: Maybe<T>): T;
+export function withDefault<T>(d: T, v?: Maybe<T>) {
+	const mapper = (v: Maybe<T>): T => {
+		if (v == null) return d;
+		return v[0];
+	}
+
+	if (v) return mapper(v);
+	return mapper;
 }
 
 export function isSome<T>(a: Maybe<T>): a is [T] {
@@ -28,20 +35,29 @@ export function maybeOfNullable<T>(v: T | null | undefined): Maybe<T> {
 	return [v];
 }
 
-export function mapSome<A, B>(a: Maybe<A>, f: (a: A) => B): Maybe<B> {
-	if (isSome(a)) {
-		return [f(a[0])];
+export function mapSome<A, B>(f: (a: A) => B): (a: Maybe<A>) => Maybe<B>;
+export function mapSome<A, B>(f: (a: A) => B, m: Maybe<A>): Maybe<B>;
+export function mapSome<A, B>(f: (a: A) => B, m?: Maybe<A>) {
+	const mapper = (a: Maybe<A>): Maybe<B> => {
+		if (isSome(a)) {
+			return [f(a[0])];
+		}
+
+		return null;
 	}
 
-	return null;
+	if (m) return mapper(m);
+	return mapper;
 }
 
-export function bindSome<A, B>(a: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> {
-	if (isSome(a)) {
-		return f(a[0]);
-	}
+export function bindSome<A, B>(f: (a: A) => Maybe<B>) {
+	return (a: Maybe<A>): Maybe<B> => {
+		if (isSome(a)) {
+			return f(a[0]);
+		}
 
-	return null;
+		return null;
+	}
 }
 
 export function applySome<A, B>(f: Maybe<(a: A) => B>, a: Maybe<A>): Maybe<B> {

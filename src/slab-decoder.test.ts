@@ -3,11 +3,11 @@ import {mapSome, withDefault} from "./maybe";
 import {DataAccessor} from "./autoproto";
 
 function testWithSlab(s: string, expectation: any) {
-	const r = mapSome(decompress(s), (v) => slab.decode(v, v.byteLength));
+	const r = mapSome((v) => slab.decode(v, v.byteLength), decompress(s));
 	expect(r).toEqual(expectation);
-	const rencoded = withDefault(mapSome(r, r => compress(slab.encode(r, (n) => new DataView(new Uint8Array(n).buffer)))), "");
+	const rencoded = withDefault("", mapSome(r => compress(slab.encode(r, (n) => new DataView(new Uint8Array(n).buffer))), r));
 	expect(decompress(s)).toEqual(decompress(rencoded))
-	const rr = mapSome(decompress(rencoded), (v) => slab.decode(v, v.byteLength));
+	const rr = mapSome((v) => slab.decode(v, v.byteLength), decompress(rencoded));
 	expect(rr).toEqual(expectation);
 }
 

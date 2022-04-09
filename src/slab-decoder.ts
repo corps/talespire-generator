@@ -7,10 +7,9 @@ const MAGIC = 3520002766;
 
 export function decompress(slabStr: string): Maybe<DataView> {
 	slabStr = slabStr.replace(/[` ]/g, "")
-	return mapSome(
-		maybeOfNullable(ungzip(new Uint8Array(atob(slabStr).split('').map(x => x.charCodeAt(0))))),
+	return mapSome<Uint8Array, DataView>(
 		v => new DataView(v.buffer)
-	)
+	)(maybeOfNullable(ungzip(new Uint8Array(atob(slabStr).split('').map(x => x.charCodeAt(0))))))
 }
 
 export function compress(v: DataView): string {

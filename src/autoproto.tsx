@@ -1,5 +1,5 @@
 import {
-	Either, joinLeftRight, left, mapRight, right
+	compose, Either, joinLeftRight, left, mapRight, right
 } from "./either";
 
 type Writer<View> = (dv: View) => void;
@@ -440,7 +440,7 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 			}
 
 			return lift(left<JsonErrorResult, JsonSpineValue<T>>([scalar, "invalid_type"]));
-		}, res => joinLeftRight(res, head => {
+		}, joinLeftRight(head => {
 			if (Array.isArray(example)) {
 				return [[example[0], head]] as JsonScalar
 			}
@@ -494,53 +494,59 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 
 	static joinWith<T>(r: JsonResult<JsonDataAcccesor<T>>): JsonDataAcccesor<JsonResult<T>> {
 		const {lift} = JsonDataAcccesor;
-		return joinLeftRight<JsonDataAcccesor<T>, JsonErrorResult, JsonDataAcccesor<JsonResult<T>>>(r,
-			accessor => accessor.map(result => right(result), result => joinLeftRight(result, v => v, err => accessor.d),),
+		return joinLeftRight<JsonDataAcccesor<T>, JsonErrorResult, JsonDataAcccesor<JsonResult<T>>>(
+			accessor => accessor.map(result => right(result), joinLeftRight(v => v, err => accessor.d),),
 			err => lift(left(err))
-		)
+		)(r);
 	}
 
 	static jsonArray<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<JsonResult<T>[]>> {
 		const {lift, joinWith} = JsonDataAcccesor;
 		return JsonDataAcccesor.readChunk(["array", 0])
-			.then(cnt => joinWith(mapRight(cnt, cnt => v.repeat(lift(cnt)))), v => mapRight(v, (v) => v.length));
+			.then(compose(mapRight((cnt: number) => v.repeat(lift(cnt))), joinWith), mapRight(v => v.length));
 	}
 
 	static jsonDict<T>(v: JsonDataAcccesor<JsonResult<T>>): JsonDataAcccesor<JsonResult<Record<string, JsonResult<T>>>> {
 		const {readChunk, lift, joinWith} = JsonDataAcccesor;
-		return readChunk(["dict", []]).then(keys => joinWith(mapRight(keys, keys => v
+		return readChunk(["dict", []]).then(
+			compose(mapRight((keys: string[]) => v
 				.repeat(lift(keys.length))
-				.map<Record<string, JsonResult<T>>>(values => Object.fromEntries(values.map((v, i) => [keys[i], v])),
+				.map(
+					values => Object.fromEntries(values.map((v, i) => [keys[i], v])),
 					o => Object.values(o)
-				))),
-			v => mapRight(v, (v) => Object.keys(v)),
+				)), joinWith),
+			mapRight(v => Object.keys(v)),
 		);
 	}
 
 	static jsonTuple<T extends JsonDataAcccesor<JsonResult<any>>[]>(...o: T): JsonDataAcccesor<JsonResult<UnwrapAccessorTuple<T>>> {
 		const {lift, group, jsonScalar, joinWith, tuple} = JsonDataAcccesor;
 		return JsonDataAcccesor.readChunk(["array", 0])
-			.then(cnt => joinWith(mapRight<number, JsonDataAcccesor<JsonResult<any>[]>, JsonErrorResult>(cnt,
-					cnt => {
+			.then(
+				compose(mapRight((cnt: number) => {
 						const fields = o.slice(0, cnt);
 						for (let i = fields.length; i < o.length; ++i) {
-							fields.push(lift(left<JsonErrorResult, any>([jsonAny.encode(joinLeftRight(o[i].d, v => v, e => null), (size) => new Array(size)) as JsonScalar, ["missing_key", i + ""]])));
+							fields.push(lift(left<JsonErrorResult, any>([
+								jsonAny.encode(joinLeftRight(v => v, e => null)(o[i].d), (size) => new Array(size)) as JsonScalar,
+								["missing_key", i + ""]
+							])));
 						}
 						for (let i = fields.length; i < cnt; ++i) {
 							fields.push(jsonScalar.map(s => left<JsonErrorResult, any>([s, ["extra_key", i + ""]]),
-								(v) => joinLeftRight(v, r => [null], ([l]) => l)
+								joinLeftRight(() => [null], ([l]) => l)
 							));
 						}
 
 						return group(fields);
-					})),
-			v => mapRight(v, v => v.length)) as JsonDataAcccesor<JsonResult<UnwrapAccessorTuple<T>>>;
+					}), joinWith),
+				mapRight(v => v.length)
+			) as JsonDataAcccesor<JsonResult<UnwrapAccessorTuple<T>>>;
 	}
 
 	static jsonObj<O extends Record<string, JsonDataAcccesor<JsonResult<any>>>>(o: O): JsonDataAcccesor<JsonResult<UnwrapAccessorRecord<O>>> {
 		const {lift, group, jsonScalar, joinWith, tuple} = JsonDataAcccesor;
 		return JsonDataAcccesor.readChunk(["dict", []])
-			.then(keys => joinWith(mapRight<string[], JsonDataAcccesor<UnwrapAccessorRecord<O>>, JsonErrorResult>(keys,
+			.then(compose(mapRight(
 				keys => {
 					const fields: JsonDataAcccesor<[string, JsonResult<any>]>[] = [];
 					const missing = {...o};
@@ -551,14 +557,14 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 							delete missing[k];
 						} else {
 							fields.push(jsonScalar.map(s => [k, left<JsonErrorResult, any>([s, ["extra_key", k]])],
-								(v) => joinLeftRight(v[1], r => [null], ([l]) => l)
+								(v) => joinLeftRight<any, JsonErrorResult, JsonScalar>(r => [null], ([l]) => l)(v[1])
 							));
 						}
 					})
 
 					Object.keys(missing).forEach(k => {
 						fields.push(lift([k, left<JsonErrorResult, any>([
-							jsonAny.encode(joinLeftRight(o[k].d, v => v, e => null), (size) => new Array(size)) as JsonScalar,
+							jsonAny.encode(joinLeftRight<any, JsonErrorResult, any>(v => v, e => null)(o[k].d), (size) => new Array(size)) as JsonScalar,
 							["missing_key", k]
 						])]));
 					});
@@ -566,9 +572,7 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 					return group(fields)
 						.map(entries => Object.fromEntries(entries) as UnwrapAccessorRecord<O>, o => Object.entries(o));
 				}
-			)), (maybeParts) => {
-				return mapRight(maybeParts, parts => Object.keys(parts));
-			})
+			), joinWith), mapRight(parts => Object.keys(parts)))
 	}
 
 
@@ -595,19 +599,19 @@ export class JsonDataAcccesor<T> extends DataAccessor<T, JsonSpine> {
 
 	static unwrap<T>(v: JsonResult<T>): T {
 		const {errorToString} = JsonDataAcccesor;
-		return joinLeftRight(v, a => a, ([node, err]) => {
+		return joinLeftRight<T, JsonErrorResult, T>(a => a, ([node, err]) => {
 			throw new Error(`Json did not match schema, error at ${JSON.stringify(jsonAny.decode(node))}: ${errorToString(err)}`)
-		})
+		})(v);
 	}
 
 	static fillOut<T>(v: JsonResult<T>, handleInvalid = JsonDataAcccesor.unwrap): T {
-		return joinLeftRight(v, a => a, ([node, err]) => {
+		return joinLeftRight<T, JsonErrorResult, T>(a => a, ([node, err]) => {
 			if (Array.isArray(err)) {
 				if (err[0] === "missing_key") return jsonAny.decode(node);
 				if (err[0] === "extra_key") return jsonAny.decode(node);
 			}
 			return handleInvalid(v);
-		})
+		})(v)
 	}
 }
 

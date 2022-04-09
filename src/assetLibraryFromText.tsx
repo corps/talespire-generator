@@ -1,15 +1,13 @@
 import React from 'react';
-import {JsonInput} from "./JsonInput";
+import {jsonFromText} from "./jsonFromText";
 import {assetDb, placeable} from "./asset-decoder";
-import {bindRight, catchErr, mapLeft, mapRight} from "./either";
+import {bindRight, catchErr} from "./either";
 import {V3} from "./vector";
-import {AutoInput} from "./autoinputs";
 import {JsonDataAcccesor} from "./autoproto";
-const {withError} = AutoInput;
 const {fillOut} = JsonDataAcccesor;
 
-export const AssetLibraryInput = withError(JsonInput.map(catchErr(v => assetDb.decode(v)))
-	.map(parsedLibrary => bindRight(parsedLibrary, catchErr(parsedLibrary => {
+export const assetLibraryFromText = jsonFromText.map(bindRight(catchErr(v => assetDb.decode(v))))
+	.map(bindRight(catchErr(parsedLibrary => {
 		const library = fillOut(parsedLibrary);
 		const result: AssetLibrary = {};
 
@@ -24,7 +22,7 @@ export const AssetLibraryInput = withError(JsonInput.map(catchErr(v => assetDb.d
 		})
 
 		return result;
-	}))).map(v => mapLeft(v, _ => "Invalid asset library json")), {});
+	})));
 
 export type AssetLibrary = { [k: string]: Asset };
 
