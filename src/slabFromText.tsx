@@ -62,7 +62,6 @@ export class Slab extends Asset {
 	toV2Slab(assets = this.assets): typeof slab.d {
 		const assetsById: Record<string, Asset[]> = {};
 		this.expand(assets).forEach(asset => {
-			if (asset.isProp) return;
 			if (!(asset.id in assetsById)) {
 				assetsById[asset.id] = [];
 			}

@@ -3,7 +3,7 @@ import {AutoMemo, useAutoMemo} from "./automemo";
 import {Either, joinLeftRight} from "./either";
 
 export type FCWithValue<T> = FC<{value: T}>
-export type FCWithOnChange<T> = FC<{value: T, onChange: Dispatch<T>, error?: string}>
+export type FCWithOnChange<T> = FC<{value: T, onChange?: Dispatch<T>, error?: string}>
 
 export function bindParams<P>(C: FC<P>, p: Partial<P>): FC<P> {
 	return (pp: P) => <C {...{...pp, ...p}}/>
@@ -16,7 +16,7 @@ export function useBoundInput<V, O=unknown>(F: FCWithOnChange<V>, value: V, onCh
 	let error: string | undefined = undefined;
 	if (memo) {
 		// eslint-disable-next-line react-hooks/rules-of-hooks
-		let result = useAutoMemo(memo, value)
+		result = useAutoMemo(memo, value)
 		error = joinLeftRight<O, string, string | undefined>(_ => undefined, error => error)(result);
 	}
 

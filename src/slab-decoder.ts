@@ -30,12 +30,14 @@ export const header = obj({
 export const uuid = tuple(tuple(hexDigit, hexDigit, hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
 	tuple(hexDigit, hexDigit),
-	tuple(hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit),
-).map(parts => [parts[0].reverse().join(''), parts[1].reverse().join(''), parts[2].reverse().join(''), parts[3].join('')].join('-'), s => [
+	tuple(hexDigit, hexDigit),
+	tuple(hexDigit, hexDigit, hexDigit, hexDigit, hexDigit, hexDigit),
+).map(parts => [parts[0].reverse().join(''), parts[1].reverse().join(''), parts[2].reverse().join(''), parts[3].join(''), parts[4].join('')].join('-'), s => [
 	[s.slice(6, 8), s.slice(4, 6), s.slice(2, 4), s.slice(0, 2)],
 	[s.slice(11, 13), s.slice(9, 11)],
 	[s.slice(16, 18), s.slice(14, 16)],
-	[s.slice(19, 21), s.slice(21, 23), s.slice(23, 25), s.slice(25, 27), s.slice(27, 29), s.slice(29, 31), s.slice(31, 33), s.slice(33, 35)]
+	[s.slice(19, 21), s.slice(21, 23)],
+	[s.slice(23, 25), s.slice(25, 27), s.slice(27, 29), s.slice(29, 31), s.slice(31, 33), s.slice(33, 35)]
 ])
 
 export const v2AssetHeader = obj({

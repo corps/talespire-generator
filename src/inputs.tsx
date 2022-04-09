@@ -3,7 +3,7 @@ import {TextField} from "@mui/material";
 
 interface Props {
 	value: string
-	onChange: Dispatch<string>,
+	onChange?: Dispatch<string>,
 	readonly?: boolean,
 	error?: string
 	label?: string

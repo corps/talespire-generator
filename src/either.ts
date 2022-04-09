@@ -68,7 +68,7 @@ export function applyRight<A, B, G>(f: Either<(a: A) => B, G>, a: Either<A, G>):
 }
 
 export function isRight(v: Either<any, any>): boolean {
-	return v.length === 1;
+	return v && v.length === 1;
 }
 
 export function catchErr<A, T>(t: (a: A) => T): (a: A) => Either<T, string> {
