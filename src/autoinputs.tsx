@@ -1,9 +1,10 @@
-import React, {Dispatch, FC} from "react";
+import React, {Dispatch, FC, PropsWithChildren} from "react";
 import {AutoMemo, useAutoMemo} from "./automemo";
 import {Either, joinLeftRight} from "./either";
 
 export type FCWithValue<T> = FC<{value: T}>
 export type FCWithOnChange<T> = FC<{value: T, onChange?: Dispatch<T>, error?: string}>
+export type AutoInputF<I> = (state: I, onChange: Dispatch<I>) => React.ReactElement | null;
 
 export function bindParams<P>(C: FC<P>, p: Partial<P>): FC<P> {
 	return (pp: P) => <C {...{...pp, ...p}}/>
@@ -27,99 +28,52 @@ export function bindValueWithError<V>(F: FCWithOnChange<V>, value: V, onChange: 
 	return [<F value={value} onChange={onChange}/>, value, onChange];
 }
 
-// export function useAutoInput()
+export class AutoInput<I, O> {
+	constructor(public output: (i: I) => O, public defaultState: I, public render: AutoInputF<I>) {
+	}
 
-// export function bindMemo()
+	withDefault(i: I) {
+		return new AutoInput(this.output, i, this.render);
+	}
 
+	usingComponent(Input: FC<{value: I, onChange: Dispatch<I>}>): AutoInput<I, O> {
+		return new AutoInput<I, O>(this.output, this.defaultState, (value, onChange) => <Input value={value} onChange={onChange}/>);
+	}
 
-// import {Either, joinLeftRight} from "./either";
-// import {Alert} from "@mui/material";
-//
-// export type ChangeParams<T> = { onChange?: (t: T) => void };
-// export type ValueParams<T> = { value: T };
-// export interface AutoInput<I, O> {
-// 	(p: ChangeParams<I> & ValueParams<I>): React.ReactElement | null;
-// 	output: (i: I) => O;
-// 	defaultState: I,
-// }
-//
-// interface ICallableInstance {
-// 	// prettier-ignore
-// 	new <Args extends unknown[], Return>(property: string): (...argv: Args) => Return;
-// 	constructor <Args extends unknown[], Return>(property: string): (...argv: Args) => Return;
-// }
-// function CallableInstanceF(this: any, property: string) {
-// 	var func = this.constructor.prototype[property];
-// 	var apply = function() { return func.apply(apply, arguments); }
-// 	Object.setPrototypeOf(apply, this.constructor.prototype);
-// 	Object.getOwnPropertyNames(func).forEach(function (p) {
-// 		const pd = Object.getOwnPropertyDescriptor(func, p);
-// 		if (!pd) {
-// 			throw new Error(`${p} is not a property!`);
-// 		}
-// 		Object.defineProperty(apply, p,  pd);
-// 	});
-// 	return apply;
-// }
-// CallableInstanceF.prototype = Object.create(Function.prototype);
-// // @ts-ignore
-// const CallableInstance: ICallableInstance = CallableInstanceF;
-//
-//
-// type UnwrapReturn<T> = T extends (p: any) => infer O ? UnwrapReturn<O> : T;
-//
-// export class AutoInput<I, O> extends CallableInstance<[ChangeParams<I> & ValueParams<I>], React.ReactElement | null> {
-// 	constructor(public output: (i: I) => O, public defaultState: I, public Input: VFC<ValueParams<I> & ChangeParams<I>>) {
-// 		super('runInput');
-// 	}
-//
-// 	runInput(...args: any[]) {
-// 		return (this.Input as any)(...args);
-// 	}
-//
-// 	withDefault(i: I) {
-// 		return new AutoInput(this.output, i, this.Input);
-// 	}
-//
-// 	usingInput<P extends ChangeParams<I> & ValueParams<I>>(Input: VFC<P>, p: Omit<Omit<P, 'value'>, 'onChange'>): AutoInput<I, O> {
-// 		return new AutoInput<I, O>(this.output, this.defaultState, ({value, onChange}) => Input({...p, onChange, value} as any));
-// 	}
-//
-// 	wrappedWith(Wrapper: FC<{}>): AutoInput<I, O> {
-// 		const {output, defaultState, Input} = this;
-// 		return new AutoInput<I, O>(output, defaultState, ({value, onChange}) => <Wrapper><Input value={value} onChange={onChange}/></Wrapper>)
-// 	}
-//
-// 	map<R>(f: (t: O) => R): AutoInput<I, R> {
-// 		return map(this, f);
-// 	}
-//
-// 	static lift<I, V>(i: I, v: V): AutoInput<I, V> {
-// 		return lift(i ,v);
-// 	}
-//
-// 	static apply = apply;
-//
-// 	static withError = withError;
-//
-// 	bind<I2, R>(f: (o: O) => AutoInput<I2, R>) {
-// 		return bind<I, I2, O, R>(this, f);
-// 	}
-//
-// 	static fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inputs) {
-// 		return fromObj(inputs);
-// 	}
-//
-// 	order<E>(values: E[]): I extends [E, E[]] ? AutoInput<E[], O[]> : never {
-// 		return order(values, this as any) as any;
-// 	}
-// }
-//
-// function map<I, O, R>({Input, output, defaultState}: AutoInput<I, O>, f: (t: O) => R): AutoInput<I, R> {
-// 	return new AutoInput<I, R>((v: I) => f(output(v)), defaultState, Input);
-// }
-//
-// const noop = () => null;
+	wrappedWith(Wrapper: (p: PropsWithChildren<{}>) => React.ReactElement): AutoInput<I, O> {
+		const {output, defaultState} = this;
+		return new AutoInput<I, O>(output, defaultState, (...args) => <Wrapper>{this.render(...args)}</Wrapper>)
+	}
+
+	map<R>(f: (t: O) => R): AutoInput<I, R> {
+		return map(this, f);
+	}
+
+	static lift<I, V>(i: I, v: V): AutoInput<I, V> {
+		return lift(i ,v);
+	}
+
+	static apply = apply;
+
+	static withError = withError;
+
+	bind<I2, R>(f: (o: O) => AutoInput<I2, R>) {
+		return bind<I, I2, O, R>(this, f);
+	}
+
+	static fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inputs) {
+		return fromObj(inputs);
+	}
+
+	order<E>(values: E[]): I extends [E, E[]] ? AutoInput<E[], O[]> : never {
+		return order(values, this as any) as any;
+	}
+}
+
+function map<I, O, R>({render, output, defaultState}: AutoInput<I, O>, f: (t: O) => R): AutoInput<I, R> {
+	return new AutoInput<I, R>((v: I) => f(output(v)), defaultState, render);
+}
+export const noop = () => null;
 //
 // export function useAutoInput<I, O>(
 // 	Input: AutoInput<I, O>,
@@ -138,97 +92,55 @@ export function bindValueWithError<V>(F: FCWithOnChange<V>, value: V, onChange: 
 // 	return [value, result, ele];
 // }
 //
-// function Lift() {
-// 	return null;
-// }
-//
-// function lift<I, V>(i: I, v: V): AutoInput<I, V> {
-// 	return new AutoInput<I, V>(() => v, i, Lift);
-// }
-//
-// function apply<I1, I2, P1, O>(Input: AutoInput<I1, (p: P1) => O>, Param: AutoInput<I2, P1>): AutoInput<[I1, I2], O> {
-// 	function Applied({onChange, value: [a, b]}: ChangeParams<[I1, I2]> & ValueParams<[I1, I2]>) {
-// 		const setLastF = useCallback((i1: I1) => onChange && onChange(
-// 			[i1, b]
-// 		), [onChange, b]);
-//
-// 		const setLastP = useCallback((i2: I2) => onChange && onChange(
-// 			[a, i2]
-// 		), [onChange, a]);
-//
-// 		return <>
-// 			<Input onChange={setLastF} value={a}/>
-// 			<Param onChange={setLastP} value={b}/>
-// 		</>
-// 	}
-//
-// 	const output = function output([a, b]: [I1, I2]): O {
-// 		return Input.output(a)(Param.output(b));
-// 	}
-// 	const defaultState = [Input.defaultState, Param.defaultState] as [I1, I2];
-//
-// 	return new AutoInput<[I1, I2], O>(output, defaultState, Applied);
-// }
-//
-// function applyNamed<K extends string, I1 extends Record<K, any>, I2, P1, O>(k: K, Input: AutoInput<I1, (p: P1) => O>, Param: AutoInput<I2, P1>): AutoInput<I1, O> {
-// 	function Applied({onChange, value}: ChangeParams<I1> & ValueParams<I1>) {
-// 		const i = value[k];
-// 		const setLastF = useCallback((i1: I1) => onChange && onChange({...i1, [k]: i}), [onChange, i]);
-// 		const setLastP = useCallback((i2: I2) => onChange && onChange({...value, [k]: i2}), [onChange, value]);
-//
-// 		return <>
-// 			<Input onChange={setLastF} value={value}/>
-// 			<Param onChange={setLastP} value={i}/>
-// 		</>
-// 	}
-//
-// 	const output = function output(v: I1): O {
-// 		return Input.output(v)(Param.output(v[k]));
-// 	}
-//
-// 	const defaultState = {...Input.defaultState, [k]: Param.defaultState};
-//
-// 	return new AutoInput<I1, O>(output, defaultState, Applied);
-// }
-//
-// function bind<I1, I2, P1, O>(Param: AutoInput<I1, P1>, f: (p: P1) => AutoInput<I2, O>): AutoInput<[I1, I2], O> {
-// 	function Bound({onChange, value: [a, b]}: ChangeParams<[I1, I2]> & ValueParams<[I1, I2]>) {
-// 		const [Op, setOp] = useState(() => f(Param.output(a)))
-// 		const setLastP = useCallback((i1: I1) => {
-// 			const newOp = f(Param.output(i1))
-// 			setOp(newOp);
-// 			onChange && onChange([i1, newOp.defaultState])
-// 		}, [onChange]);
-//
-// 		const setLastF = useCallback((i2: I2) => {
-// 			onChange && onChange([a, i2])
-// 		}, [a, onChange]);
-//
-// 		return <>
-// 			<Param onChange={setLastP} value={a}/>
-// 			<Op onChange={setLastF} value={b}/>
-// 		</>
-// 	}
-//
-// 	const output = function output(v: [I1, I2]): O {
-// 		return f(Param.output(v[0])).output(v[1]);
-// 	}
-//
-// 	const defaultState = [Param.defaultState, f(Param.output(Param.defaultState)).defaultState] as [I1, I2];
-//
-// 	return new AutoInput<[I1, I2], O>(output, defaultState, Bound);
-// }
-//
-// type UnwrapAutoInput<T extends AutoInput<any, any>> = T extends AutoInput<any, infer V> ? V : unknown;
-// type RecordFromAutoInputs<Inputs extends Record<string, AutoInput<any, any>>> = {
-// 	[A in keyof Inputs]: UnwrapAutoInput<Inputs[A]>
-// }
-//
-// type UnwrapAutoInputValue<T extends AutoInput<any, any>> = T extends AutoInput<infer V, any> ? V : unknown;
-// type ValueRecordFromAutoInputs<Inputs extends Record<string, AutoInput<any, any>>> = {
-// 	[A in keyof Inputs]: UnwrapAutoInputValue<Inputs[A]>
-// }
-//
+
+function lift<I, V>(i: I, v: V): AutoInput<I, V> {
+	return new AutoInput<I, V>(() => v, i, () => null);
+}
+
+function apply<I1, I2, P1, O>(input: AutoInput<I1, (p: P1) => O>, param: AutoInput<I2, P1>): AutoInput<[I1, I2], O> {
+	return new AutoInput<[I1, I2], O>(([a, b]) => input.output(a)(param.output(b)), [input.defaultState, param.defaultState], ([a, b], onChange) => {
+		return <>
+			{input.render(a, (i1) => onChange && onChange([i1, b]))}
+			{param.render(b, (i2) => onChange && onChange([a, i2]))}
+		</>
+	});
+}
+
+function applyNamed<K extends string, I1 extends Record<K, any>, I2, P1, O>(
+	k: K,
+	Input: AutoInput<I1, (p: P1) => O>,
+	Param: AutoInput<I2, P1>
+): AutoInput<I1, O> {
+	return new AutoInput<I1, O>(v => Input.output(v)(Param.output(v[k])), {...Input.defaultState, [k]: Param.defaultState}, (value, onChange) => {
+		const i = value[k];
+		return <>
+			{Input.render(value, (i1: I1) => onChange && onChange({...i1, [k]: i}))}
+			{Param.render(i, (i2: I2) => onChange && onChange({...value, [k]: i2}))}
+		</>
+	})
+}
+
+function bind<I1, I2, P1, O>(Param: AutoInput<I1, P1>, f: (p: P1) => AutoInput<I2, O>): AutoInput<[I1, I2], O> {
+	return new AutoInput<[I1, I2], O>(
+		v => f(Param.output(v[0])).output(v[1]),
+		[Param.defaultState, f(Param.output(Param.defaultState)).defaultState] as [I1, I2],
+		([a, b], onChange) => <>
+			{Param.render(a, i1 => onChange && onChange([i1, b]))}
+			{f(Param.output(a)).render(b, i2 => onChange && onChange([a, i2]))}
+		</>
+	);
+}
+
+type UnwrapAutoInput<T extends AutoInput<any, any>> = T extends AutoInput<any, infer V> ? V : unknown;
+type RecordFromAutoInputs<Inputs extends Record<string, AutoInput<any, any>>> = {
+	[A in keyof Inputs]: UnwrapAutoInput<Inputs[A]>
+}
+
+type UnwrapAutoInputValue<T extends AutoInput<any, any>> = T extends AutoInput<infer V, any> ? V : unknown;
+type ValueRecordFromAutoInputs<Inputs extends Record<string, AutoInput<any, any>>> = {
+	[A in keyof Inputs]: UnwrapAutoInputValue<Inputs[A]>
+}
+
 // function fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inputs): AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>> {
 // 	const keys = Object.keys(inputs);
 // 	let Input = lift({} as ValueRecordFromAutoInputs<Inputs>, {}) as AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>>;
