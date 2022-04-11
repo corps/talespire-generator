@@ -1,31 +1,15 @@
-import React, {Dispatch, FC, PropsWithChildren} from "react";
-import {AutoMemo, useAutoMemo} from "./automemo";
+import React, {Dispatch, FC, PropsWithChildren, useCallback, useMemo, useState} from "react";
 import {Either, joinLeftRight} from "./either";
 
 export type FCWithValue<T> = FC<{value: T}>
 export type FCWithOnChange<T> = FC<{value: T, onChange?: Dispatch<T>, error?: string}>
 export type AutoInputF<I> = (state: I, onChange: Dispatch<I>) => React.ReactElement | null;
 
+export const noop = () => null;
+export const identity = (i: any) => i;
+
 export function bindParams<P>(C: FC<P>, p: Partial<P>): FC<P> {
 	return (pp: P) => <C {...{...pp, ...p}}/>
-}
-
-export function useBoundInput<V>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>): [React.ReactElement | null, V, Dispatch<V>, undefined];
-export function useBoundInput<V, O>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>, memo: AutoMemo<V, Either<O, string>>): [React.ReactElement | null, V, Dispatch<V>, Either<O, string>];
-export function useBoundInput<V, O=unknown>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>, memo?: AutoMemo<V, Either<O, string>>): [React.ReactElement | null, V, Dispatch<V>, Either<O, string> | undefined] {
-	let result: any;
-	let error: string | undefined = undefined;
-	if (memo) {
-		// eslint-disable-next-line react-hooks/rules-of-hooks
-		result = useAutoMemo(memo, value)
-		error = joinLeftRight<O, string, string | undefined>(_ => undefined, error => error)(result);
-	}
-
-	return [<F value={value} onChange={onChange} error={error}/>, value, onChange, result];
-}
-
-export function bindValueWithError<V>(F: FCWithOnChange<V>, value: V, onChange: Dispatch<V>): [React.ReactElement | null, V, Dispatch<V>] {
-	return [<F value={value} onChange={onChange}/>, value, onChange];
 }
 
 export class AutoInput<I, O> {
@@ -43,6 +27,10 @@ export class AutoInput<I, O> {
 	wrappedWith(Wrapper: (p: PropsWithChildren<{}>) => React.ReactElement): AutoInput<I, O> {
 		const {output, defaultState} = this;
 		return new AutoInput<I, O>(output, defaultState, (...args) => <Wrapper>{this.render(...args)}</Wrapper>)
+	}
+
+	static fromComponent<I>(Component: FC<{value: I, onChange: Dispatch<I>}>, d: I): AutoInput<I, I> {
+		return new AutoInput<I, I>(identity, d, (value, onChange) => <Component value={value} onChange={onChange}/>)
 	}
 
 	map<R>(f: (t: O) => R): AutoInput<I, R> {
@@ -73,25 +61,25 @@ export class AutoInput<I, O> {
 function map<I, O, R>({render, output, defaultState}: AutoInput<I, O>, f: (t: O) => R): AutoInput<I, R> {
 	return new AutoInput<I, R>((v: I) => f(output(v)), defaultState, render);
 }
-export const noop = () => null;
-//
-// export function useAutoInput<I, O>(
-// 	Input: AutoInput<I, O>,
-// 	callback: Dispatch<O> = noop,
-// 	d = Input.defaultState,
-// ): [I, O, React.ReactElement | null] {
-// 	const [value, setValue] = useState(() => d);
-//
-// 	const setAndCb = useCallback((v: I) => {
-// 		setValue(() => v);
-// 		callback(Input.output(v))
-// 	}, [Input, callback]);
-//
-// 	const result = useMemo(() => Input.output(value), [Input, value])
-// 	const ele = useMemo(() => <Input value={value} onChange={setAndCb}/>, [Input, setAndCb, value])
-// 	return [value, result, ele];
-// }
-//
+
+
+export function useAutoInput<I, O>(
+	Input: AutoInput<I, O>,
+	callback: Dispatch<O> = noop,
+	d = Input.defaultState,
+): [I, O, React.ReactElement | null] {
+	const [value, setValue] = useState(() => d);
+
+	const setAndCb = useCallback((v: I) => {
+		setValue(() => v);
+		callback(Input.output(v))
+	}, [Input, callback]);
+
+	const result = useMemo(() => Input.output(value), [Input, value])
+	const ele = useMemo(() => Input.render(value, setAndCb), [Input, setAndCb, value])
+	return [value, result, ele];
+}
+
 
 function lift<I, V>(i: I, v: V): AutoInput<I, V> {
 	return new AutoInput<I, V>(() => v, i, () => null);
@@ -141,54 +129,58 @@ type ValueRecordFromAutoInputs<Inputs extends Record<string, AutoInput<any, any>
 	[A in keyof Inputs]: UnwrapAutoInputValue<Inputs[A]>
 }
 
-// function fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inputs): AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>> {
-// 	const keys = Object.keys(inputs);
-// 	let Input = lift({} as ValueRecordFromAutoInputs<Inputs>, {}) as AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>>;
-// 	keys.forEach(k => {
-// 		Input = applyNamed(
-// 			k,
-// 			map(Input,(existing: RecordFromAutoInputs<Inputs>) => (nextValue: RecordFromAutoInputs<Inputs>) => ({...existing, [k]: nextValue}) ),
-// 			map(inputs[k], v => ({[k]: v}) as RecordFromAutoInputs<Inputs>)
-// 		);
-// 	})
-//
-// 	return Input;
-// }
-//
-//
-// function order<I, O>(values: I[], Selector: AutoInput<[I, I[]], O>): AutoInput<I[], O[]> {
-// 	function reorder(is: I[]): [I, I[]][] {
-// 		let available = values;
-// 		const result: [I, I[]][] = [];
-//
-// 		is.forEach(n => {
-// 			let availableIdx = available.indexOf(n);
-// 			availableIdx = availableIdx === -1 ? 0 : availableIdx;
-// 			result.push([available[availableIdx], available]);
-// 			available = [...available];
-// 			available.splice(availableIdx, 1);
-// 		})
-//
-// 		return result;
-// 	}
-//
-// 	function Ordering({value, onChange}: ValueParams<I[]> & ChangeParams<I[]>) {
-// 		const reordered = useMemo(() => reorder(value), [value]);
-// 		const onChanges = useMemo(() => values.map((_, i) => ([v]: [I, I[]]) => onChange && onChange([...value.slice(0, i), v, ...value.slice(i + 1)])), [value, onChange]);
-// 		return <>{reordered.map((state, i) => <Selector key={i} onChange={onChanges[i]} value={state}/>)}</>
-// 	}
-//
-// 	const output = function output(i: I[]): O[] {
-// 		const reordered = reorder(i);
-// 		return reordered.map(Selector.output);
-// 	}
-//
-// 	return new AutoInput<I[], O[]>(output, values, Ordering);
-// }
-//
-// function withError<I, O>(left: AutoInput<I, Either<O, string>>, d: O): AutoInput<[I, null], O> {
-// 	return left.bind<null, O>(
-// 		(v: Either<O, string>) => joinLeftRight(v,
-// 			(v: O) => lift(null, v),
-// 			err => lift(null, d).wrappedWith(() => <Alert severity="warning">{err}</Alert>)))
-// }
+function fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inputs): AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>> {
+	const keys = Object.keys(inputs);
+	let Input = lift({} as ValueRecordFromAutoInputs<Inputs>, {}) as AutoInput<ValueRecordFromAutoInputs<Inputs>, RecordFromAutoInputs<Inputs>>;
+	keys.forEach(k => {
+		Input = applyNamed(
+			k,
+			map(Input,(existing: RecordFromAutoInputs<Inputs>) => (nextValue: RecordFromAutoInputs<Inputs>) => ({...existing, [k]: nextValue}) ),
+			map(inputs[k], v => ({[k]: v}) as RecordFromAutoInputs<Inputs>)
+		);
+	})
+
+	return Input;
+}
+
+function order<I, O>(values: I[], Selector: AutoInput<[I, I[]], O>): AutoInput<I[], O[]> {
+	function reorder(is: I[]): [I, I[]][] {
+		let available = values;
+		const result: [I, I[]][] = [];
+
+		is.forEach(n => {
+			let availableIdx = available.indexOf(n);
+			availableIdx = availableIdx === -1 ? 0 : availableIdx;
+			result.push([available[availableIdx], available]);
+			available = [...available];
+			available.splice(availableIdx, 1);
+		})
+
+		return result;
+	}
+
+	function Ordering(value: I[], onChange: Dispatch<I[]>) {
+		const reordered = reorder(value);
+		return <>
+			{reordered.map((state, i) => <React.Fragment key={i}>
+				{Selector.render(state, ([v]: [I, I[]]) =>
+					onChange && onChange([...value.slice(0, i), v, ...value.slice(i + 1)])}
+			</React.Fragment>
+			)}
+		</>
+	}
+
+	const output = function output(i: I[]): O[] {
+		const reordered = reorder(i);
+		return reordered.map(Selector.output);
+	}
+
+	return new AutoInput<I[], O[]>(output, values, Ordering);
+}
+
+function withError<I, O>(left: AutoInput<I, Either<O, string>>, d: O): AutoInput<[I, null], O> {
+	return left.bind<null, O>(
+		(v: Either<O, string>) => joinLeftRight(v,
+			(v: O) => lift(null, v),
+			err => lift(null, d).wrappedWith(() => <Alert severity="warning">{err}</Alert>)))
+}
