@@ -33,11 +33,16 @@ export function mapLeft<A, B, G>(f: (b: G) => B) {
 	}
 }
 
-export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B) {
-	return (v: Either<A, AA>): B => {
+export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B): (a: Either<A, AA>) => B;
+export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B, a: Either<A, AA>): B;
+export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B, a?: Either<A, AA>) {
+	const mapper = (v: Either<A, AA>): B => {
 		if (v.length === 1) return fr(v[0]);
 		return fl(v[1]);
 	}
+
+	if (a) return mapper(a);
+	return mapper;
 }
 
 export function bindRight<A, B, G>(f: (a: A) => Either<B, G>): (a: Either<A, G>) => Either<B, G>;

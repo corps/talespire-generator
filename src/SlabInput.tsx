@@ -1,25 +1,29 @@
 import React from 'react';
 import {decompress, slab, uuid} from "./slab-decoder";
 import {mapSome, Maybe, withDefault} from "./maybe";
-import {bindRight, catchErr, compose, Either, left, mapRight, right} from "./either";
-import {Asset, AssetLibrary} from "./assetLibraryFromText";
+import {bindRight, catchErr, compose, Either, left, mapLeft, mapRight, right} from "./either";
+import {Asset, AssetLibrary} from "./AssetLibraryInput";
 import {V3} from "./vector";
-import {AutoMemo} from "./automemo";
+import {AutoInput, bindParams} from "./autoinputs";
+import {TextInput} from "./inputs";
 
-export const slabFromText = new AutoMemo(compose(compose<string, Maybe<DataView>, Maybe<Either<DataView, string>>>(decompress, mapSome(right)), withDefault(left("Invalid gzip"))), "" as string)
- 	.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
-	.map(bindRight(catchErr(v2slab => {
-		return (library: AssetLibrary) => {
-			const slab = new Slab("<pasted>");
-			v2slab.assets.map(({id, positions}) => {
-				positions.forEach(pos => {
-					slab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
-				});
-			})
+export const SlabInput =
+	AutoInput.renderWithErr(
+		AutoInput.lift("", "").map(decompress).map(mapSome(right)).map(withDefault(left("Invalid gzip, probably incomplete slab")))
+		.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
+		.map(mapLeft(err => "Invalid slab, possible version mismatch."))
+		.map(bindRight(catchErr(v2slab => {
+			return (library: AssetLibrary) => {
+				const slab = new Slab("<pasted>");
+				v2slab.assets.map(({id, positions}) => {
+					positions.forEach(pos => {
+						slab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
+					});
+				})
 
-			return slab;
-		}
-	})))
+				return slab;
+			}
+		}))), bindParams(TextInput, {label: "Slab"}))
 
 function uuidv4() {
 	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {

@@ -1,9 +1,8 @@
-import React, {PropsWithChildren, useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useMemo, useRef} from 'react';
 import {Canvas, extend, ReactThreeFiber, useThree} from "@react-three/fiber";
 import Color from 'color';
 import { V3 } from './vector';
-import {Slab} from "./slabFromText";
-import {TextField} from "@mui/material";
+import {Slab} from "./SlabInput";
 import {TabSet} from "./TabSet";
 import {compress, slab as slabAccessor} from './slab-decoder'
 import {TextInput} from "./inputs";

@@ -1,12 +1,12 @@
 import React from 'react';
-import {jsonFromText} from "./jsonFromText";
+import {JsonInput} from "./JsonInput";
 import {assetDb, placeable} from "./asset-decoder";
 import {bindRight, catchErr} from "./either";
 import {V3} from "./vector";
 import {JsonDataAcccesor} from "./autoproto";
 const {fillOut} = JsonDataAcccesor;
 
-export const assetLibraryFromText = jsonFromText.map(bindRight(catchErr(v => assetDb.decode(v))))
+export const AssetLibraryInput = JsonInput({label: "Asset library (index.json)", mask: "<hidden for size>"}).map(bindRight(catchErr(v => assetDb.decode(v))))
 	.map(bindRight(catchErr(parsedLibrary => {
 		const library = fillOut(parsedLibrary, "(top level object)");
 		const result: AssetLibrary = {};

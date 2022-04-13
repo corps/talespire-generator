@@ -1,40 +1,31 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {Box, Button, Container} from "@mui/material";
+import React from 'react';
+import {Box, Container} from "@mui/material";
 import {SlabPreview} from "./SlabPreview";
-import {Slab, slabFromText} from "./slabFromText";
+import {Slab, SlabInput} from "./SlabInput";
 import {useLocalStorage} from "./useLocalStorage";
-import {assetLibraryFromText} from "./assetLibraryFromText";
-import {bindParams, useBoundInput} from "./autoinputs";
-import {TextInput} from "./inputs";
-import {bindRight, isRight, mapRight} from "./either";
-import {ShowResult} from "./WithError";
+import {AssetLibraryInput} from "./AssetLibraryInput";
+import {useAutoInput} from "./autoinputs";
+import {bindRight, joinLeftRight, mapRight} from "./either";
 
-const SlabInput = bindParams(TextInput, {label: "Slab"});
-const LibraryInput = bindParams(TextInput, {label: "Asset Library (index.json)", value: ""});
+const SlabAndAssetInput = SlabInput.bind(slab =>
+	AssetLibraryInput.map(assetLib => bindRight(f => mapRight(p => f(p), assetLib), slab)));
 
 function App() {
-	const [slabInput, slabText, _, slabFromAssetLibrary] = useBoundInput(SlabInput,
-		...useLocalStorage(slabFromText.defaultState, 'pastedSlab'), slabFromText);
-	const [libraryInput, libraryText, __, assetLibrary] = useBoundInput(LibraryInput,
-		...useLocalStorage(assetLibraryFromText.defaultState, 'assetLibrary'), assetLibraryFromText);
-	const [showLibraryInput, setShowLibraryInput] = useState(false);
+	const [slabCode, setSlabCode] = useLocalStorage("", 'pastedSlab');
+	const [assetLibCode, setAssetLibCode] = useLocalStorage("", 'assetLibrary');
 
-	useEffect(() => {
-		if (isRight(assetLibrary)) {
-			setShowLibraryInput(false);
-		}
-	}, [assetLibrary]);
-
-	const slab = bindRight(f => mapRight(p => f(p), assetLibrary), slabFromAssetLibrary);
+	const [_, decodedSlab, setupInput] = useAutoInput(SlabAndAssetInput, ([slab, asset]) => {
+		setSlabCode(slab);
+		setAssetLibCode(asset);
+	}, [slabCode, assetLibCode] as [string, string]);
 
 	return (
 		<Container>
 			<Box>
-				{slabInput}
-				{showLibraryInput ? libraryInput : <Button onClick={() => setShowLibraryInput(true)}>Edit Asset Library</Button>}
+				{setupInput}
 			</Box>
 			<Box>
-				<ShowResult value={mapRight(slab => <SlabPreview slab={slab}/>, slab)}/>
+				{ joinLeftRight(slab => <SlabPreview slab={slab}/>, err => null, decodedSlab) }
 			</Box>
 		</Container>
 	)
