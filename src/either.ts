@@ -26,11 +26,17 @@ export function compose<A, B, C>(f: (a: A) => B, g: (b: B) => C): (a: A) => C {
 	return (a: A) => g(f(a));
 }
 
-export function mapLeft<A, B, G>(f: (b: G) => B) {
-	return (v: Either<A, G>): Either<A, B> => {
+export function mapLeft<A, B, G>(f: (b: G) => B): (v: Either<A, G>) => Either<A, B>;
+export function mapLeft<A, B, G>(f: (b: G) => B, v: Either<A, G>): Either<A, B>;
+export function mapLeft<A, B, G>(f: (b: G) => B, v?: Either<A, G>) {
+	const mapper = (v: Either<A, G>): Either<A, B> => {
 		if (v.length === 2) return [null, f(v[1])];
 		return v;
 	}
+
+	if (v) return mapper(v);
+
+	return mapper;
 }
 
 export function joinLeftRight<A, AA, B>(fr: (a: A) => B, fl: (a: AA) => B): (a: Either<A, AA>) => B;
@@ -81,6 +87,7 @@ export function catchErr<A, T>(t: (a: A) => T): (a: A) => Either<T, string> {
 		try {
 			return right(t(a));
 		} catch (e) {
+			console.error(e);
 			return left(e + "")
 		}
 	}

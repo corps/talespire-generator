@@ -30,4 +30,8 @@ export class V3 {
 	static min(a: V3, b: V3): V3 {
 		return new V3(Math.min(a.x, b.x), Math.max(a.y, b.y), Math.max(a.z, b.z));
 	}
+
+	toString() {
+		return `x: ${this.x}, y: ${this.y}, z: ${this.z}`
+	}
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import {decompress, slab, uuid} from "./slab-decoder";
+import {compress, decompress, slab, uuid} from "./slab-decoder";
 import {mapSome, Maybe, withDefault} from "./maybe";
 import {bindRight, catchErr, compose, Either, left, mapLeft, mapRight, right} from "./either";
 import {Asset, AssetLibrary} from "./AssetLibraryInput";
@@ -9,19 +9,18 @@ import {TextInput} from "./inputs";
 
 export const SlabInput =
 	AutoInput.renderWithErr(
-		AutoInput.lift("", "").map(decompress).map(mapSome(right)).map(withDefault(left("Invalid gzip, probably incomplete slab")))
+		AutoInput.ident("").map(decompress).map(mapSome(right)).map(withDefault(left("Invalid gzip, probably incomplete slab")))
 		.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
-		.map(mapLeft(err => "Invalid slab, possible version mismatch."))
 		.map(bindRight(catchErr(v2slab => {
 			return (library: AssetLibrary) => {
-				const slab = new Slab("<pasted>");
+				const integratedSlab = new Slab("<pasted>");
 				v2slab.assets.map(({id, positions}) => {
 					positions.forEach(pos => {
-						slab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
+						integratedSlab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
 					});
 				})
 
-				return slab;
+				return integratedSlab;
 			}
 		}))), bindParams(TextInput, {label: "Slab"}))
 
@@ -43,7 +42,8 @@ export class Slab extends Asset {
 
 	addFromLibrary(id: string, position: V3, rot: number, library: AssetLibrary) {
 		if (id in library) {
-			this.add(library[id].repositioned(position, rot));
+			const item = library[id];
+			this.add(item.repositioned(position.shift(item.center), rot));
 		} else {
 			if (!this.unknownIds.has(id)) {
 				this.unknownIds = new Set<string>([...this.unknownIds, id])

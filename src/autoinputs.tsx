@@ -42,6 +42,10 @@ export class AutoInput<I, O> {
 		return lift(i ,v);
 	}
 
+	static ident<I>(defaultState: I): AutoInput<I, I> {
+		return new AutoInput<I, I>(i => i, defaultState, () => null);
+	}
+
 	static apply = apply;
 
 	bind<I2, R>(f: (o: O) => AutoInput<I2, R>) {

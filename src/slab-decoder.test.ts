@@ -20,7 +20,7 @@ describe('slab-decoder', () => {
 						{
 							"assets": [
 								{
-									"id": "8b748f53-ba19-6e49-87df10618a931874",
+									"id": "538f748b-19ba-496e-87df-10618a931874",
 									"positions": [
 										{
 											"rot": 255,
@@ -31,7 +31,7 @@ describe('slab-decoder', () => {
 									]
 								},
 								{
-									"id": "b821efe2-4261-3541-98599281a8b256fc",
+									"id": "e2ef21b8-6142-4135-9859-9281a8b256fc",
 									"positions": [
 										{
 											"rot": 135,

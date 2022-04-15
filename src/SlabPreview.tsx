@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {Canvas, extend, ReactThreeFiber, useThree} from "@react-three/fiber";
 import Color from 'color';
 import { V3 } from './vector';
@@ -7,6 +7,8 @@ import {TabSet} from "./TabSet";
 import {compress, slab as slabAccessor} from './slab-decoder'
 import {TextInput} from "./inputs";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import {Asset} from "./AssetLibraryInput";
+import {mapSome, Maybe, some, withDefault} from "./maybe";
 
 extend({ OrbitControls });
 
@@ -35,10 +37,17 @@ export function SlabPreview({slab}: Props) {
 		return result;
 	}, [slab.seenIds, slab.unknownIds])
 
-	const {assets} = slab;
-	console.log({assets})
+	const [hoveredAsset, setHoveredAsset] = useState(null as Maybe<Asset>)
+	const onHover = useCallback((hover: boolean, asset: Asset) => {
+		if (hover)
+			setHoveredAsset(some(asset));
+		else if (withDefault(false, mapSome(a => a === asset, hoveredAsset)))
+			setHoveredAsset(null);
+	}, [hoveredAsset])
 
-	const preview = <Canvas
+	const {assets} = slab;
+
+	const canvas = <Canvas
 		style={{width: 640, height: 480}}
 		// camera={{ position: [-2, 3, -1], near: 0.1, far: 15 }}
 	>
@@ -46,10 +55,19 @@ export function SlabPreview({slab}: Props) {
 		<spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
 		<pointLight position={[-10, -10, -10]} />
 		{slab.assets.map((asset, i) =>
-			<AssetBlock key={i + ""} rot={asset.rot} center={asset.center} extent={asset.extents} color={assetColorings[asset.id].hex()}/>
+			<AssetBlock key={i + ""} asset={asset} color={assetColorings[asset.id].hex()} onHover={onHover} scale={
+				withDefault(false, mapSome(a => a === asset, hoveredAsset)) ? 1.25 : 1
+			}/>
 		)}
 		<Controls/>
 	</Canvas>
+
+	const preview = <div>
+		<div>{canvas}</div>
+		<div>
+			{withDefault("", mapSome(asset => `Name: ${asset.name}, Pos: ${asset.center}, Extent: ${asset.extents}, Rotation: ${asset.rot}`, hoveredAsset))}
+		</div>
+	</div>
 
 	const serialized = useMemo(() => {
 		return compress(slabAccessor.encode(slab.toV2Slab(assets), (size) => new DataView(new Uint8Array(size).buffer)));
@@ -69,32 +87,32 @@ function Controls() {
 }
 
 interface BoxProps {
-	center: V3,
-	extent: V3,
-	rot: number,
+	asset: Asset,
 	color: string,
-	onHover?: (hovered: boolean) => void,
+	onHover?: (hovered: boolean, asset: Asset) => void,
 	onClick?: () => void,
 	active?: boolean,
+	scale?: number
 }
 
-function AssetBlock({center, extent, rot, color, onClick, onHover, active}: BoxProps) {
+function AssetBlock({asset, color, onClick, onHover, active, scale=1}: BoxProps) {
+	const {rot, extents, center} = asset;
 	const mesh = useRef()
 	const activeColor = useMemo(() => new Color(color).lighten(0.6).hex(), [color]);
-	const extentT = useMemo(() => extent.asTuple(), [extent]);
+	const extentsT = useMemo(() => extents.scale(scale).scale(2).asTuple(), [extents, scale]);
 	const centerT = useMemo(() => center.asTuple(), [center]);
-	const hoverIn = useCallback(() => onHover && onHover(true), [onHover]);
-	const hoverOut = useCallback(() => onHover && onHover(false), [onHover]);
+	const hoverIn = useCallback(() => onHover && onHover(true, asset), [asset, onHover]);
+	const hoverOut = useCallback(() => onHover && onHover(false, asset), [asset, onHover]);
 
 	return (
 		<mesh
 			ref={mesh}
 			position={centerT}
-			rotation={[0, rot * -Math.PI / 180, 0]}
+			rotation={[0, rot * Math.PI / 180, 0]}
 			onClick={onClick}
 			onPointerOver={hoverIn}
 			onPointerOut={hoverOut}>
-			<boxBufferGeometry args={extentT} />
+			<boxBufferGeometry args={extentsT} />
 			<meshStandardMaterial color={active ? activeColor : color} />
 		</mesh>
 	)

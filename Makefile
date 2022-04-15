@@ -8,9 +8,9 @@ help: ## Display help text
 		awk -F':.*?## ' '{printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: run
-run: image.marker ## Runs the development server
-	docker run --rm -it -v $$(pwd):/app talespire-generator npm install
-	docker run --rm -it -p 3000:3000 -v $$(pwd):/app talespire-generator
+run: ## Runs the development server
+	docker run --rm -it --workdir /app -v $$(pwd):/app node:14 npm install
+	docker run --rm -it --workdir /app -p 3000:3000 -v $$(pwd):/app node:14 npm start
 
 .PHONY: bash
 bash: image.marker ## Opens a bash environment for development
