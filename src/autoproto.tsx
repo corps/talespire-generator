@@ -636,10 +636,11 @@ export const jsonAny: JsonDataAcccesor<any> = new JsonDataAcccesor<any>((idx, dv
 			case "string":
 				return [next[1], idx + 1];
 			case "dict":
-				const [values, i] = jsonAny.repeat(JsonDataAcccesor.lift(next[1].length)).read(idx + 1, dv);
-				return [Object.fromEntries(values.map((v, j) => [next[1][j], v])), i];
+				const keys: string[] = next[1] as string[];
+				const [values, i] = jsonAny.repeat(JsonDataAcccesor.lift(keys.length)).read(idx + 1, dv);
+				return [Object.fromEntries(values.map((v, j) => [keys[j], v])), i];
 			case "array":
-				return jsonAny.repeat(JsonDataAcccesor.lift(next[1])).read(idx + 1, dv);
+				return jsonAny.repeat(JsonDataAcccesor.lift(next[1] as number)).read(idx + 1, dv);
 			default:
 				throw new Error(`Unexpected type ${type}!`)
 		}

@@ -11,8 +11,14 @@ export class V3 {
 		return new V3(Math.floor(this.x), Math.floor(this.y), Math.floor(this.z));
 	}
 
-	scale(f: number) {
-		return new V3(this.x * f, this.y * f, this.z * f);
+	scale(f: number): V3;
+	scale(f: V3): V3;
+	scale(f: number | V3) {
+		if (f instanceof V3) {
+			return new V3(this.x * f.x, this.y * f.y, this.z * f.z);
+		} else {
+			return new V3(this.x * f, this.y * f, this.z * f);
+		}
 	}
 
 	shift(other: V3) {

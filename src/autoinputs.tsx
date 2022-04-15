@@ -161,6 +161,39 @@ function fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inp
 	return Input;
 }
 
+function fromOptions<Result, Option extends AutoInput<any, keyof Inputs>, Inputs extends Record<string, AutoInput<any, Result>>>(
+	inputs: Inputs,
+	optionSelector: Option,
+) {
+
+	return new AutoInput<[UnwrapAutoInputValue<Option>, ValueRecordFromAutoInputs<Inputs>], Result>(
+		([s, values]) => inputs[optionSelector.output(s)].output(values[optionSelector.output(s)]),
+		inputs[optionSelector.output(optionSelector.defaultState)].defaultState,
+		([s, values], onChange) => {
+			const k = optionSelector.output(s);
+			return <>
+				{optionSelector.render(s, newS => onChange([newS, values]), optionSelector.defaultState, optionSelector.output)}
+				{inputs[k].render(values[k], (newV => onChange([s, {...values, [k]: newV}])), inputs[k].defaultState, inputs[k].output)}
+			</>;
+		},
+	);
+}
+
+function several<I, O>(input: AutoInput<I, O>, validate: (i: I) => boolean): AutoInput<I[], O[]> {
+	return new AutoInput<I[], O[]>(
+		is => is.filter(validate).map(input.output),
+		[],
+		(state, onChange) => {
+			return <>
+				{state.map((s, i) => <React.Fragment key={i}>
+					{input.render(s, v => onChange([...state.slice(0, i), v, ...state.slice(i + 1)].filter(validate)), input.defaultState, input.output)}
+				</React.Fragment>)}
+			</>
+		}
+	)
+}
+
+
 function order<I, O>(values: I[], selector: AutoInput<[I, I[]], O>): AutoInput<I[], O[]> {
 	function reorder(is: I[]): [I, I[]][] {
 		let available = values;
