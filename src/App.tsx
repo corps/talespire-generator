@@ -3,9 +3,10 @@ import {Box, Container} from "@mui/material";
 import {SlabPreview} from "./SlabPreview";
 import {Slab, SlabInput} from "./SlabInput";
 import {useLocalStorage} from "./useLocalStorage";
-import {AssetLibraryInput} from "./AssetLibraryInput";
+import {Asset, AssetLibraryInput} from "./AssetLibraryInput";
 import {useAutoInput} from "./autoinputs";
 import {bindRight, joinLeftRight, mapRight} from "./either";
+import {SlabPipelineInput} from "./SlabOperation";
 
 const SlabAndAssetInput = SlabInput.bind(slab =>
 	AssetLibraryInput.map(assetLib => bindRight(f => mapRight(p => f(p), assetLib), slab)));
@@ -19,13 +20,20 @@ function App() {
 		setAssetLibCode(asset);
 	}, [slabCode, assetLibCode] as [string, string]);
 
+	const [__, pipeline, pipelineInput] = useAutoInput(SlabPipelineInput);
+
+	// decodedSlab = mapRight(slab => bindRight())
+
 	return (
 		<Container>
 			<Box>
 				{setupInput}
 			</Box>
 			<Box>
-				{ joinLeftRight(slab => <SlabPreview slab={slab}/>, err => null, decodedSlab) }
+				{ joinLeftRight(slab => <>
+					{pipelineInput}
+					<SlabPreview slab={slab}/>
+				</>, err => null, decodedSlab) }
 			</Box>
 		</Container>
 	)

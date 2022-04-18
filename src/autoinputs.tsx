@@ -56,6 +56,9 @@ export class AutoInput<I, O> {
 		return fromObj(inputs);
 	}
 
+	static fromOptions = fromOptions;
+	static several = several;
+
 	order<E>(values: E[]): I extends [E, E[]] ? AutoInput<E[], O[]> : never {
 		return order(values, this as any) as any;
 	}
@@ -161,12 +164,11 @@ function fromObj<Inputs extends Record<string, AutoInput<any, any>>>(inputs: Inp
 	return Input;
 }
 
-function fromOptions<Result, Option extends AutoInput<any, keyof Inputs>, Inputs extends Record<string, AutoInput<any, Result>>>(
-	inputs: Inputs,
-	optionSelector: Option,
+function fromOptions<Result, Options extends string>(
+	inputs: Record<Options, AutoInput<any, Result>>,
+	optionSelector: AutoInput<any, Options>,
 ) {
-
-	return new AutoInput<[UnwrapAutoInputValue<Option>, ValueRecordFromAutoInputs<Inputs>], Result>(
+	return new AutoInput<[unknown, Record<Options, unknown>], Result>(
 		([s, values]) => inputs[optionSelector.output(s)].output(values[optionSelector.output(s)]),
 		inputs[optionSelector.output(optionSelector.defaultState)].defaultState,
 		([s, values], onChange) => {

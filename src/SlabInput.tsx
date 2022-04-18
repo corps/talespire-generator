@@ -13,10 +13,10 @@ export const SlabInput =
 		.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
 		.map(bindRight(catchErr(v2slab => {
 			return (library: AssetLibrary) => {
-				const integratedSlab = new Slab("<pasted>");
+				const integratedSlab = new Slab("<pasted>", library);
 				v2slab.assets.map(({id, positions}) => {
 					positions.forEach(pos => {
-						integratedSlab.addFromLibrary(id, V3.fromObj(pos), pos.rot, library);
+						integratedSlab.addFromLibrary(id, V3.fromObj(pos), pos.rot);
 					});
 				})
 
@@ -36,26 +36,32 @@ export class Slab extends Asset {
 	public seenIds: Set<string> = new Set<string>();
 	public unknownIds: Set<string> = new Set<string>();
 
-	constructor(name: string, id: string = uuidv4()) {
+	constructor(name: string, public library: Record<string, Asset>, assets: Asset[] = [], id: string = uuidv4()) {
 		super(new V3(0, 0, 0), new V3(0, 0, 0), 0, name, id, false)
+		assets.forEach(asset => this.add(asset));
 	}
 
-	addFromLibrary(id: string, position: V3, rot: number, library: AssetLibrary) {
-		if (id in library) {
-			const item = library[id];
+	copy(assets = this.assets) {
+		return new Slab(
+			this.name,
+			this.library,
+			assets,
+			this.id,
+		)
+	}
+
+	addFromLibrary(id: string, position: V3, rot: number) {
+		if (id in this.library) {
+			const item = this.library[id];
 			this.add(item.repositioned(position.shift(item.center), rot));
 		} else {
-			if (!this.unknownIds.has(id)) {
-				this.unknownIds = new Set<string>([...this.unknownIds, id])
-			}
+			this.unknownIds.add(id);
 		}
 	}
 
 	add(asset: Asset) {
-		this.assets = [...this.assets, asset]
-		if (!this.seenIds.has(asset.id)) {
-			this.seenIds = new Set<string>([...this.seenIds, asset.id])
-		}
+		this.assets.push(asset);
+		this.seenIds.add(asset.id);
 		this.stretchTo(asset);
 	}
 

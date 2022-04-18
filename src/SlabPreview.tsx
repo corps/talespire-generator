@@ -62,6 +62,10 @@ export function SlabPreview({slab}: Props) {
 		<Controls/>
 	</Canvas>
 
+	const stats = <>
+		Extents: {slab.extents.toString()}, Objects: {slab.expand().length}
+	</>
+
 	const preview = <div>
 		<div>{canvas}</div>
 		<div>
@@ -74,7 +78,7 @@ export function SlabPreview({slab}: Props) {
 	}, [assets, slab])
 
 	const source = <TextInput readonly value={serialized}/>;
-	return <TabSet options={{preview, source}}/>
+	return <TabSet options={{stats, preview, source}}/>
 }
 
 function Controls() {
