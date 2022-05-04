@@ -1,8 +1,8 @@
 import {AutoInput, bindParams} from "./autoinputs";
-import {SelectInputWithOptions, TextInput} from "./inputs";
-import {Asset} from "./AssetLibraryInput";
+import {TextInput} from "./inputs";
 import {Slab} from "./SlabInput";
 import {V3} from "./vector";
+import {OptionsInput} from "./OptionsInput";
 
 const CreateRectangleOperation = AutoInput.fromObj({
 	height: AutoInput.fromComponent(bindParams(TextInput, {label: "height"}), "1"),
@@ -28,11 +28,7 @@ const CreateRectangleOperation = AutoInput.fromObj({
 })
 
 const CreateShapes = {
-	[""]: AutoInput.lift(null, (slab: Slab) => slab),
 	["Rectangle"]: CreateRectangleOperation,
 }
 
-export const CreateShapeOperation = AutoInput.fromOptions(
-	CreateShapes,
-	AutoInput.fromComponent(SelectInputWithOptions(Object.keys(CreateShapes)), "")
-)
+export const CreateShapeOperation = OptionsInput<(s: Slab)=> Slab, typeof CreateShapes>(CreateShapes)

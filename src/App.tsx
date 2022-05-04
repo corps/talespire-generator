@@ -1,39 +1,34 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Box, Container} from "@mui/material";
-import {SlabPreview} from "./SlabPreview";
 import {Slab, SlabInput} from "./SlabInput";
 import {useLocalStorage} from "./useLocalStorage";
-import {Asset, AssetLibraryInput} from "./AssetLibraryInput";
+import {AssetLibraryInput} from "./AssetLibraryInput";
 import {useAutoInput} from "./autoinputs";
 import {bindRight, joinLeftRight, mapRight} from "./either";
-import {SlabPipelineInput} from "./SlabOperation";
-
-const SlabAndAssetInput = SlabInput.bind(slab =>
-	AssetLibraryInput.map(assetLib => bindRight(f => mapRight(p => f(p), assetLib), slab)));
+import {SlabPipeline} from "./SlabOperation";
+import {SlabPreview} from "./SlabPreview";
 
 function App() {
 	const [slabCode, setSlabCode] = useLocalStorage("", 'pastedSlab');
 	const [assetLibCode, setAssetLibCode] = useLocalStorage("", 'assetLibrary');
 
-	const [_, decodedSlab, setupInput] = useAutoInput(SlabAndAssetInput, ([slab, asset]) => {
-		setSlabCode(slab);
-		setAssetLibCode(asset);
-	}, [slabCode, assetLibCode] as [string, string]);
-
-	const [__, pipeline, pipelineInput] = useAutoInput(SlabPipelineInput);
-
-	// decodedSlab = mapRight(slab => bindRight())
+	const [slabFactory, slabInput] = useAutoInput(SlabInput, slabCode => setSlabCode(slabCode), slabCode);
+	const [assetLibrary, libraryInput] = useAutoInput(AssetLibraryInput, assetCode => setAssetLibCode(assetCode), assetLibCode);
+	const decodedSlab = useMemo(() => bindRight(f => mapRight(p => f(p), assetLibrary), slabFactory), [assetLibrary, slabFactory]);
+	const slabPipeline = useMemo(() => SlabPipeline(joinLeftRight(s => s, e => new Slab('', {}), decodedSlab)), [decodedSlab])
+	const [slab, pipelineInput] = useAutoInput(slabPipeline);
 
 	return (
 		<Container>
 			<Box>
-				{setupInput}
+				{slabInput}
+				{libraryInput}
 			</Box>
 			<Box>
-				{ joinLeftRight(slab => <>
-					{pipelineInput}
-					<SlabPreview slab={slab}/>
-				</>, err => null, decodedSlab) }
+				{joinLeftRight(s => <SlabPreview slab={s}/>, e => null, decodedSlab)}
+			</Box>
+			<Box>
+				{pipelineInput}
 			</Box>
 		</Container>
 	)
