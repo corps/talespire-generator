@@ -1,4 +1,4 @@
-import React, {ChangeEvent, Dispatch, FC, useCallback} from "react";
+import React, {ChangeEvent, Dispatch, FC, useCallback, useEffect, useState} from "react";
 import {MenuItem, Select, SelectChangeEvent, TextField} from "@mui/material";
 
 export interface TextInputProps {
@@ -12,9 +12,18 @@ export interface TextInputProps {
 }
 
 export function TextInput({value, onChange, readonly, error, label, helper, mask}: TextInputProps) {
-	const onChange_ = useCallback((e: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => onChange && onChange(e.target.value), [onChange]);
-	return <TextField size="medium" sx={{m: 1, width: '45ch' }} margin="normal" value={value ? mask ? mask : value : value}
-										multiline maxRows={5} onChange={e => onChange_(e)} disabled={readonly} aria-readonly={readonly}
+	const onBlur = useCallback((e: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => onChange && onChange(e.target.value), [onChange]);
+	const [v, setValue] = useState(() => value);
+	const onAnyChange = useCallback((e: ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => setValue(e.target.value), []);
+
+	useEffect(() => {
+		setValue(value)
+	}, [value])
+
+
+
+	return <TextField size="medium" sx={{m: 1, width: '45ch' }} margin="normal" value={v ? mask ? mask : v : v}
+										multiline maxRows={1} onChange={onAnyChange} onBlur={onBlur} disabled={readonly} aria-readonly={readonly}
 										error={!!error} helperText={error || helper} label={label} />;
 }
 
