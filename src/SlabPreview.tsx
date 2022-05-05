@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {Dispatch, useCallback, useMemo, useRef, useState} from 'react';
 import {Canvas, extend, ReactThreeFiber, useThree} from "@react-three/fiber";
 import Color from 'color';
 import { V3 } from './vector';
@@ -16,7 +16,7 @@ interface Props {
 	slab: Slab,
 }
 
-export function SlabPreview({slab}: Props) {
+function SlabCanvas({slab, hoveredAsset, setHoveredAsset}: Props & {hoveredAsset: Maybe<Asset>, setHoveredAsset: Dispatch<Maybe<Asset>>}) {
 	const assetColorings = useMemo(() => {
 		const result: Record<string, Color> = {};
 		let head: Color = Color.rgb(140, 10, 15);
@@ -37,17 +37,15 @@ export function SlabPreview({slab}: Props) {
 		return result;
 	}, [slab.seenIds, slab.unknownIds])
 
-	const [hoveredAsset, setHoveredAsset] = useState(null as Maybe<Asset>)
 	const onHover = useCallback((hover: boolean, asset: Asset) => {
 		if (hover)
 			setHoveredAsset(some(asset));
 		else if (withDefault(false, mapSome(a => a === asset, hoveredAsset)))
 			setHoveredAsset(null);
-	}, [hoveredAsset])
+	}, [hoveredAsset, setHoveredAsset])
 
-	const {assets} = slab;
 
-	const canvas = <Canvas
+	return <Canvas
 		style={{width: 640, height: 480}}
 		// camera={{ position: [-2, 3, -1], near: 0.1, far: 15 }}
 	>
@@ -61,13 +59,18 @@ export function SlabPreview({slab}: Props) {
 		)}
 		<Controls/>
 	</Canvas>
+}
+
+export function SlabPreview({slab}: Props) {
+	const {assets} = slab;
+	const [hoveredAsset, setHoveredAsset] = useState(null as Maybe<Asset>)
 
 	const stats = <>
 		Extents: {slab.extents.toString()}, Objects: {slab.expand().length}
 	</>
 
 	const preview = <div>
-		<div>{canvas}</div>
+		<div><SlabCanvas slab={slab} hoveredAsset={hoveredAsset} setHoveredAsset={setHoveredAsset}/></div>
 		<div>
 			{withDefault("", mapSome(asset => `Name: ${asset.name}, Pos: ${asset.center}, Extent: ${asset.extents}, Rotation: ${asset.rot}`, hoveredAsset))}
 		</div>

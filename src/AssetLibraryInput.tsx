@@ -68,6 +68,6 @@ export class Asset {
 			(newTopRight.y - newBottomLeft.y) / 2,
 			(newTopRight.z - newBottomLeft.z) / 2
 		);
-		this.extents = newTopRight.shift(newBottomLeft.scale(-1));
+		this.extents = newTopRight.shift(newBottomLeft.scale(-1)).scale(0.5);
 	}
 }

@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {Box, Container} from "@mui/material";
+import {Box, Container, Divider, Stack} from "@mui/material";
 import {Slab, SlabInput} from "./SlabInput";
 import {useLocalStorage} from "./useLocalStorage";
 import {AssetLibraryInput} from "./AssetLibraryInput";
@@ -20,16 +20,19 @@ function App() {
 
 	return (
 		<Container>
-			<Box>
-				{slabInput}
-				{libraryInput}
-			</Box>
-			<Box>
-				{joinLeftRight(s => <SlabPreview slab={s}/>, e => null, decodedSlab)}
-			</Box>
-			<Box>
+			<Stack divider={<Divider/>} spacing={1}>
+				<Box>
+					<h2>Generate Slab</h2>
+					<Box>
+						{slabInput}
+						{libraryInput}
+					</Box>
+					<Box>
+						{joinLeftRight(s => <SlabPreview slab={s}/>, e => null, decodedSlab)}
+					</Box>
+				</Box>
 				{pipelineInput}
-			</Box>
+			</Stack>
 		</Container>
 	)
 }

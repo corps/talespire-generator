@@ -38,6 +38,6 @@ export class V3 {
 	}
 
 	toString() {
-		return `x: ${this.x}, y: ${this.y}, z: ${this.z}`
+		return `x: ${this.x.toFixed(2)}, y: ${this.y.toFixed(2)}, z: ${this.z.toFixed(2)}`
 	}
 }

@@ -15,11 +15,14 @@ const CreateRectangleOperation = AutoInput.fromObj({
 		const newSlab = slab.copy([]);
 
 		const asset = Object.values(slab.library)[0];
+		console.log({asset})
 
 		// bottom right anchor
 		const bottomRightAnchorOffset = new V3(-1, 0, -1).scale(asset.extents);
-		let brush = newSlab.repositioned(bottomRightAnchorOffset, 0);
+		let brush = asset.repositioned(bottomRightAnchorOffset, 0);
+		console.log({brush})
 		newSlab.add(brush);
+		console.log({newSlab})
 		// brush = brush.repositioned(
 		// 	brush.center.shift(new V3(Math.max(1, Math.min(brush.extents.x * 2, widthN - brush.extents.x - brush.center.x)), 0, 0)), 0);
 
