@@ -110,37 +110,6 @@ export class BitView {
 	}
 }
 
-// 1 2 [0, 3]
-
-
-// export class JsonView {
-// 	constructor(public data: any, public d: any) {
-// 	}
-//
-// 	static undefined: JsonSpineAtom = [[], undefined];
-// 	static null: JsonSpineAtom = [[], null];
-// 	static emptyPath: any[] = [];
-//
-// 	read(index: number): ReadonlyArray<JsonSpineAtom> {
-// 		if (index >= this.data.length) throw new Error('Unexpected EOF!');
-// 		return this.data[index];
-// 	}
-//
-// 	write(index: number, value: JsonSpineAtom) {
-// 		if (index >= this.data.length) throw new Error('Unexpected EOF!');
-// 		// @ts-ignore
-// 		this.data[index] = value;
-// 	}
-//
-// 	static fromLength(len: number): JsonView {
-// 		return new JsonView(new Array(len));
-// 	}
-//
-// 	static readString(expectedPath = JsonView.emptyPath) {
-//
-// 	}
-// }
-
 export class DataAccessor<State, View> {
 	constructor(public read: Read<State, View>, public write: Write<State, View>, public d: State) {
 	}

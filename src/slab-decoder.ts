@@ -1,9 +1,17 @@
 import {gzip, ungzip} from "pako";
-import {mapSome, Maybe, maybeOfNullable} from "./maybe";
+import {isSome, mapSome, Maybe, maybeOfNullable} from "./maybe";
 import {byte, DataAccessor, float32, int16, pack, uint16, uint32, unpack} from "./autoproto";
 
 const {tuple, lift, array, obj} = DataAccessor;
 const MAGIC = 3520002766;
+
+export function parseSlab(slabStr: string) {
+	const d = decompress(slabStr);
+	if (isSome(d)) {
+		return slab.decode(d[0], d[0].byteLength);
+	}
+	throw new Error("Invalid slab string, could not decompress text.")
+}
 
 export function decompress(slabStr: string): Maybe<DataView> {
 	slabStr = slabStr.replace(/[` ]/g, "")

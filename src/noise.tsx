@@ -1,10 +1,3 @@
-import {AutoInput, bindParams} from "./autoinputs";
-import {catchErr, left, mapRight, right} from "./either";
-import {TextInput} from "./inputs";
-import {Maybe, some} from "./maybe";
-import {FloatInput} from "./IntegerInput";
-import {OptionsInput} from "./OptionsInput";
-
 export type NoiseMap = (x: number, y: number) => number;
 
 export type NoiseMapOperation = (nm: NoiseMap) => NoiseMap;
@@ -131,29 +124,10 @@ export const simplex2: SeedableNoiseMap = wrapWithPerm(function simplex2(perm, g
 	}
 });
 
-export const NoiseMapInput = AutoInput.renderWithErr(
-	AutoInput.ident("").map(v => {
-		const p = parseInt(v, 10);
-		if ((p + "") === v) return right(p);
-		return left(`${v} is not a valid integer`)
-	}).map(mapRight(simplex2)).map(mapRight(cached)),
-	bindParams(TextInput, {label: 'Noise Seed'})
-)
-
-const scale = (xs: number) => (ys: number) => (m: NoiseMap) => (x: number, y: number) => m(x * xs, y * ys);
-const octave = (scale: number) => (m: NoiseMap) => (x: number, y: number) => (m(x, y) + (scale * m(x / scale + 1, y / scale + 1))) / (1 + scale)
-const redistribute = (exp: number) => (m: NoiseMap) => (x: number, y: number) => Math.pow(m(x, y), exp)
-const ladder = (levels: number) => (m: NoiseMap) => (x: number, y: number) => Math.round(m(x, y) * levels) / levels
-
-const NoiseOperators = {
-	[""]: AutoInput.lift(null, null as Maybe<NoiseMapOperation>),
-	["Scale"]: AutoInput.apply(AutoInput.apply(AutoInput.lift(null, scale), FloatInput({label: 'Scale X'})), FloatInput({label: 'Scale Y'})).map(some),
-	["Octave"]: AutoInput.apply(AutoInput.lift(null, octave), FloatInput({label: 'Amplitude'})).map(some),
-	["Redistribute"]: AutoInput.apply(AutoInput.lift(null, redistribute), FloatInput({label: 'Exponent'})).map(some),
-	["Ladder"]: AutoInput.apply(AutoInput.lift(null, ladder), FloatInput({label: 'Steps'})).map(some),
-}
-
-export const NoiseOperation = OptionsInput<Maybe<NoiseMapOperation>, typeof NoiseOperators>(NoiseOperators);
+export const scale = (xs: number) => (ys: number) => (m: NoiseMap) => (x: number, y: number) => m(x * xs, y * ys);
+export const octave = (scale: number) => (m: NoiseMap) => (x: number, y: number) => (m(x, y) + (scale * m(x / scale + 1, y / scale + 1))) / (1 + scale)
+export const redistribute = (exp: number) => (m: NoiseMap) => (x: number, y: number) => Math.pow(m(x, y), exp)
+export const ladder = (levels: number) => (m: NoiseMap) => (x: number, y: number) => Math.round(m(x, y) * levels) / levels
 
 function cached(nm: NoiseMap): NoiseMap {
 	const cache: {[k: string]: number} = {};

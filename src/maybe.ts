@@ -69,4 +69,3 @@ export function applySome<A, B>(f: Maybe<(a: A) => B>, a: Maybe<A>): Maybe<B> {
 
 	return null;
 }
-

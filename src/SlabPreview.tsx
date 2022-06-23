@@ -2,13 +2,13 @@ import React, {Dispatch, useCallback, useMemo, useRef, useState} from 'react';
 import {Canvas, extend, ReactThreeFiber, useThree} from "@react-three/fiber";
 import Color from 'color';
 import { V3 } from './vector';
-import {Slab} from "./SlabInput";
 import {TabSet} from "./TabSet";
 import {compress, slab as slabAccessor} from './slab-decoder'
 import {TextInput} from "./inputs";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import {Asset} from "./AssetLibraryInput";
+import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 import {mapSome, Maybe, some, withDefault} from "./maybe";
+import {Asset} from "./assets";
+import {Slab} from "./slab";
 
 extend({ OrbitControls });
 
@@ -106,7 +106,7 @@ function AssetBlock({asset, color, onClick, onHover, active, scale=1}: BoxProps)
 	const {rot, extents, center} = asset;
 	const mesh = useRef()
 	const activeColor = useMemo(() => new Color(color).lighten(0.6).hex(), [color]);
-	const extentsT = useMemo(() => extents.scale(scale).scale(2).asTuple(), [extents, scale]);
+	const extentsT = useMemo(() => extents.scale(scale || 1).scale(2).asTuple(), [extents, scale]);
 	const centerT = useMemo(() => center.asTuple(), [center]);
 	const hoverIn = useCallback(() => onHover && onHover(true, asset), [asset, onHover]);
 	const hoverOut = useCallback(() => onHover && onHover(false, asset), [asset, onHover]);
@@ -116,7 +116,7 @@ function AssetBlock({asset, color, onClick, onHover, active, scale=1}: BoxProps)
 			ref={mesh}
 			position={centerT}
 			rotation={[0, rot * Math.PI / 180, 0]}
-			onClick={onClick}
+			onClick={onClick || undefined}
 			onPointerOver={hoverIn}
 			onPointerOut={hoverOut}>
 			<boxBufferGeometry args={extentsT} />

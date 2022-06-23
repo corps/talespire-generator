@@ -1,28 +1,6 @@
-import React from 'react';
-import {compress, decompress, slab, uuid} from "./slab-decoder";
-import {mapSome, Maybe, withDefault} from "./maybe";
-import {bindRight, catchErr, compose, Either, left, mapLeft, mapRight, right} from "./either";
-import {Asset, AssetLibrary} from "./AssetLibraryInput";
 import {V3} from "./vector";
-import {AutoInput, bindParams} from "./autoinputs";
-import {TextInput} from "./inputs";
-
-export const SlabInput =
-	AutoInput.renderWithErr(
-		AutoInput.ident("").map(decompress).map(mapSome(right)).map(withDefault(left("Invalid gzip, probably incomplete slab")))
-		.map(bindRight(catchErr(bytes => slab.decode(bytes, bytes.byteLength))))
-		.map(bindRight(catchErr(v2slab => {
-			return (library: AssetLibrary) => {
-				const integratedSlab = new Slab("<pasted>", library);
-				v2slab.assets.map(({id, positions}) => {
-					positions.forEach(pos => {
-						integratedSlab.addFromLibrary(id, V3.fromObj(pos), pos.rot);
-					});
-				})
-
-				return integratedSlab;
-			}
-		}))), bindParams(TextInput, {label: "Slab"}))
+import {slab} from "./slab-decoder";
+import {Asset, AssetLibrary} from "./assets";
 
 function uuidv4() {
 	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -35,6 +13,17 @@ export class Slab extends Asset {
 	public assets: Asset[] = [];
 	public seenIds: Set<string> = new Set<string>();
 	public unknownIds: Set<string> = new Set<string>();
+
+	static fromV2SlabAndLibrary(v2slab: typeof slab.d, library: AssetLibrary) {
+		const integratedSlab = new Slab("<pasted>", library);
+		v2slab.assets.map(({id, positions}) => {
+			positions.forEach(pos => {
+				integratedSlab.addFromLibrary(id, V3.fromObj(pos), pos.rot);
+			});
+		})
+
+		return integratedSlab;
+	}
 
 	constructor(name: string, public library: Record<string, Asset>, assets: Asset[] = [], id: string = uuidv4()) {
 		super(new V3(0, 0, 0), new V3(0, 0, 0), 0, name, id, false)

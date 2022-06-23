@@ -82,13 +82,11 @@ export function isRight(v: Either<any, any>): boolean {
 	return v && v.length === 1;
 }
 
-export function catchErr<A, T>(t: (a: A) => T): (a: A) => Either<T, string> {
-	return (a: A) => {
-		try {
-			return right(t(a));
-		} catch (e) {
-			console.error(e);
-			return left(e + "")
-		}
+export function catchErr<T>(t: () => T): Either<T, string> {
+	try {
+		return right(t());
+	} catch (e) {
+		console.error(e);
+		return left(e + "")
 	}
 }
